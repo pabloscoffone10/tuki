@@ -1,0 +1,19 @@
+name: tuki-concurrency
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: tuki_test_owner
+      POSTGRES_PASSWORD: local-disposable-tests-only
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:55439:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./init-concurrency.sql:/docker-entrypoint-initdb.d/01-tests.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tuki_test_owner -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

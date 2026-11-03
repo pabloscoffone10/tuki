@@ -1,0 +1,12 @@
+import { financeError } from "@/features/finance/errors";
+const messages:Record<string,string>={
+ operation_unresolved:"Hay una operación anterior sin conciliar. Consultá el resultado original antes de iniciar otro pago.",operation_unavailable:"No tenés acceso a ese intento o ya fue cancelado.",operation_cancelled:"Este intento se canceló sin registrar pago. Consultá su resultado antes de iniciar otro.",invalid_input:"Los datos no son válidos. No se registró un pago con este intento.",
+ payment_receiver_required:"Solo el receptor puede confirmar o rechazar este pago. Si hay invitados, también puede actuar un administrador autorizado del origen.",payment_admin_not_allowed:"La confirmación administrativa requiere al menos un invitado y permisos de administrador sobre el grupo de origen.",payment_confirmation_mode:"Elegí confirmación personal del receptor o confirmación administrativa, sin combinar ambas.",
+ payment_forbidden:"No tenés autorización para esta operación de pago.",payment_counterparty_required:"Aplicá la migración 009: debe confirmar el receptor o, si hay invitados, un administrador del origen con motivo.",
+ payment_guest_origin_required:"Para un invitado, elegí el grupo de origen de la deuda. La confirmación administrativa solo puede cubrir obligaciones de ese grupo.",
+ payment_over_amount:"El importe supera la deuda neta disponible. Puede haber cambiado o estar compensada por deudas inversas. Recargá antes de continuar.",
+ payment_not_assignable:"No se puede asignar todo el pago a las obligaciones elegidas. Revisá el importe y la selección.",payment_selection_changed:"Las obligaciones seleccionadas cambiaron o no están autorizadas. Recargá y revisá la selección.",
+ payment_conflict:"El pago cambió o ya fue procesado. Recargá la página.",payment_idempotency_conflict:"Este intento ya existe con otros datos. Recargá para revisar el pago guardado.",payment_invalid_parties:"Elegí dos personas distintas con una deuda autorizada.",payment_reason_required:"Explicá el motivo con al menos 8 caracteres.",
+ expense_has_confirmed_payments:"Este gasto incluye personas con pagos confirmados entre sí. Antes de editarlo o anularlo, las personas autorizadas deben anular esos pagos. Se conserva todo el historial.",
+};
+export function paymentError(error:{message?:string;code?:string}){if(error.message&&messages[error.message])return messages[error.message];if(error.code==="PGRST202")return "Aplicá las migraciones de pagos hasta la 009 en Supabase.";return financeError(error);}

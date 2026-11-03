@@ -1,0 +1,9 @@
+// @vitest-environment node
+import { beforeEach,it,expect,vi } from "vitest";
+const mocks=vi.hoisted(()=>({getUser:vi.fn(),from:vi.fn(),select:vi.fn(),eq:vi.fn(),single:vi.fn()}));
+vi.mock("@/lib/supabase/server",()=>({createClient:async()=>({auth:{getUser:mocks.getUser},from:mocks.from})}));
+import { GET } from "@/app/(private)/pagos/[paymentId]/comprobante/route";
+const id="00000000-0000-4000-8000-000000000001",context={params:Promise.resolve({paymentId:id})};
+beforeEach(()=>{vi.resetAllMocks();const chain={select:mocks.select,eq:mocks.eq,maybeSingle:mocks.single};mocks.from.mockReturnValue(chain);mocks.select.mockReturnValue(chain);mocks.eq.mockReturnValue(chain);mocks.getUser.mockResolvedValue({data:{user:{id:"user"}},error:null});mocks.single.mockResolvedValue({data:{receipt_data:"\\x255044462d74657374",receipt_mime:"application/pdf"},error:null});});
+it("requires verified session and returns a private attachment under payment RLS",async()=>{const response=await GET(new Request("http://localhost"),context);expect(response.status).toBe(200);expect(mocks.from).toHaveBeenCalledWith("payments");expect(mocks.eq).toHaveBeenCalledWith("id",id);expect(response.headers.get("cache-control")).toBe("private, no-store");expect(response.headers.get("content-disposition")).toContain("attachment");expect(await response.text()).toBe("%PDF-test");});
+it("does not expose inaccessible payment receipts or raw diagnostics",async()=>{mocks.single.mockResolvedValue({data:null,error:{message:"private SQL"}});const response=await GET(new Request("http://localhost"),context);expect(response.status).toBe(404);expect(await response.text()).not.toContain("SQL");mocks.getUser.mockResolvedValue({data:{user:null},error:null});expect((await GET(new Request("http://localhost"),context)).status).toBe(401);});

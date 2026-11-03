@@ -1,0 +1,6 @@
+import type { SmartBill } from "@/features/smart-bills/domain";
+import type { SplitMethod, Obligation } from "./domain";
+export type FinanceSummary = { obligations: Obligation[]; ledger: {person_id:string;display_name:string;paid_minor:string;consumed_minor:string;balance_minor:string;payment_paid_minor?:string;payment_received_minor?:string}[] };
+export type ExpenseRow = {id:string;group_id:string;group_name:string;status:string;version:number;title:string;category:string;expense_date:string;total_minor:string};
+export type FinancePerson = {id:string;name:string;status:string;replaced:boolean};
+export type ExpenseDetail = {payment_lock_reason?:string;payment_lock_resolution?:string;payment_locked?:boolean;smartBill?:SmartBill;smartHistory?:{revision_id:string;document:SmartBill;upload_id:string|null}[];id:string;group_id:string;group_name:string;archived:boolean;status:string;version:number;can_edit:boolean;title:string;notes:string;category:string;date:string;payer_id:string;currency:string;original_minor:string;rate:string;total_minor:string;method:SplitMethod;receipt:{id:string;name:string}|null;shares:{personId:string;amount_minor:string;input_value:string}[];people:FinancePerson[];history:{id:string;version:number;title:string;total_minor:string;created_at:string;receipt:boolean}[];events:{kind:string;version:number;created_at:string}[]};

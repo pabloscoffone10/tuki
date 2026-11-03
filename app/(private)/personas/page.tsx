@@ -1,0 +1,9 @@
+import { Suspense } from "react";
+import { requireUser } from "@/features/auth/session";
+import { createReadOnlyClient } from "@/lib/supabase/server";
+import { ActionForm } from "@/features/groups/components/action-form";
+import { Confirmation } from "@/features/groups/components/fields";
+import { safeRemoval } from "@/features/finance/actions";
+export const metadata={title:"Mis invitados"};
+async function Content(){const user=await requireUser();const client=await createReadOnlyClient();const {data,error}=await client.from("persons").select("id,display_name").eq("created_by",user.id).is("user_id",null).is("merged_into",null).order("display_name");if(error)return <p role="alert">No pudimos consultar tus invitados.</p>;return <div className="space-y-5"><h1 className="text-3xl font-semibold">Invitados que creé</h1><p className="max-w-2xl text-sm leading-7 text-muted-foreground">Solo se puede borrar una identidad sin cuenta cuando no tiene ninguna referencia en grupos, invitaciones o historial. Haber retirado a alguien de un grupo no elimina su identidad global.</p>{data?.map(p=><details key={p.id} className="rounded-xl border p-5"><summary className="cursor-pointer text-sm">{p.display_name} · {p.id.slice(0,8)}</summary><div className="mt-4"><ActionForm action={safeRemoval} label="Eliminar invitado sin referencias" variant="outline"><input type="hidden" name="id" value={p.id}/><input type="hidden" name="mode" value="guest"/><Confirmation>Confirmo que quiero borrar definitivamente esta identidad. El servidor comprobará que no tenga referencias.</Confirmation></ActionForm></div></details>)}{!data?.length&&<p className="text-sm text-muted-foreground">No creaste invitados sin cuenta.</p>}</div>;}
+export default function Page(){return <Suspense fallback={<p>Cargando invitados…</p>}><Content/></Suspense>;}

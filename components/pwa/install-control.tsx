@@ -1,0 +1,13 @@
+"use client";
+import { useState,useSyncExternalStore } from "react";
+import { Button } from "@/components/ui/button";
+import { consumeInstallPrompt,useInstallState } from "./install-events";
+
+function installedSnapshot(){return window.matchMedia?.("(display-mode: standalone)").matches||(navigator as Navigator&{standalone?:boolean}).standalone===true;}
+function subscribeInstalled(listener:()=>void){const media=window.matchMedia?.("(display-mode: standalone)");media?.addEventListener?.("change",listener);return()=>media?.removeEventListener?.("change",listener);}
+export function InstallControl(){
+ const {prompt,installed}=useInstallState();const [busy,setBusy]=useState(false),[error,setError]=useState(false);
+ const standalone=useSyncExternalStore(subscribeInstalled,installedSnapshot,()=>false);
+ async function install(){if(!prompt||busy)return;setBusy(true);setError(false);try{await prompt.prompt();await prompt.userChoice;}catch{setError(true);}finally{consumeInstallPrompt();setBusy(false);}}
+ return <section aria-label="Instalar Tuki" className="space-y-3 rounded-xl border bg-card p-5"><h2 className="font-semibold">Tuki en tu pantalla de inicio</h2>{installed||standalone?<p className="text-sm text-muted-foreground">Estás usando Tuki en modo instalado.</p>:<><p className="text-sm leading-7 text-muted-foreground">La instalación es opcional. La disponibilidad depende del navegador; no necesitás instalarla para usar Tuki.</p>{prompt&&<Button type="button" onClick={install} disabled={busy}>{busy?"Abriendo instalación…":"Instalar Tuki"}</Button>}<details><summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">Cómo instalar en iPhone, Android o computadora</summary><div className="space-y-3 pt-3 text-sm leading-7 text-muted-foreground"><p><strong>iPhone o iPad:</strong> abrí Tuki en Safari, tocá Compartir y elegí Agregar a pantalla de inicio. Si la opción no aparece, revisá el menú del navegador o abrí el enlace fuera del navegador de otra aplicación.</p><p><strong>Android o computadora:</strong> buscá Instalar aplicación o Agregar a pantalla de inicio en el menú del navegador. El botón de Tuki aparece solo cuando el navegador ofrece su instalación.</p><p>Una instalación en iOS puede tener una sesión distinta de Safari. Iniciá sesión de nuevo si se solicita; Tuki no copia tokens entre ventanas.</p><p>La aplicación necesita conexión para consultar datos y registrar operaciones financieras. No registra pagos sin conexión.</p></div></details></>}{error&&<p role="alert" className="text-sm text-destructive">No pudimos abrir la instalación. Podés intentar desde el menú del navegador.</p>}</section>;
+}

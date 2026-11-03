@@ -1,0 +1,9 @@
+"use server";
+import { z } from "zod";
+import { requireUser } from "@/features/auth/session";
+import { createClient } from "@/lib/supabase/server";
+import type { Inbox,Preferences } from "./types";
+export async function inbox():Promise<{data?:Inbox;error?:string}>{await requireUser();try{const client=await createClient();const {data,error}=await client.rpc("tuki_notification_inbox");if(error)return {error:"No pudimos cargar las notificaciones. Revisá la migración 008."};return {data:data as Inbox};}catch{return {error:"No pudimos cargar las notificaciones."};}}
+export async function readNotice(id:string|null){await requireUser();if(id&&!z.uuid().safeParse(id).success)return {error:"Notificación inválida."};const client=await createClient();const {error}=await client.rpc("tuki_read_notification",{p_id:id});return error?{error:"No pudimos marcar la notificación."}:{success:true};}
+export async function savePreferences(value:Preferences){await requireUser();const parsed=z.object({payments:z.boolean(),expenses:z.boolean(),groups:z.boolean(),reminders:z.boolean(),automatic:z.boolean(),frequency:z.union([z.literal(7),z.literal(14)])}).safeParse(value);if(!parsed.success)return {error:"Revisá las preferencias."};const client=await createClient();const {error}=await client.rpc("tuki_set_notification_preferences",{p_data:parsed.data});return error?{error:"No pudimos guardar las preferencias."}:{success:true};}
+export async function remindDebt(debtor:string){await requireUser();if(!z.uuid().safeParse(debtor).success)return {error:"Persona inválida."};const client=await createClient();const {data,error}=await client.rpc("tuki_remind_debt",{p_debtor:debtor});if(error)return {error:error.message==="reminder_rate_limit"?"Ya enviaste un recordatorio recientemente. Máximo uno por persona cada 24 horas y cinco por día.":"Solo quien tiene un saldo pendiente por cobrar puede recordarlo."};return {message:String(data)};}

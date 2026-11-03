@@ -1,0 +1,13 @@
+vi.mock("next/navigation",()=>({useRouter:()=>({refresh:vi.fn()})}));
+vi.mock("@/features/payments/actions",()=>({transitionPayment:vi.fn(async()=>({success:"ok"}))}));
+import { render,screen,waitFor,act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach,it,expect,vi } from "vitest";
+const mocks=vi.hoisted(()=>({inbox:vi.fn(),read:vi.fn()}));
+vi.mock("@/features/notifications/actions",()=>({inbox:mocks.inbox,readNotice:mocks.read,savePreferences:async()=>({success:true})}));
+import { NotificationsProvider,NotificationList,NotificationBell } from "@/features/notifications/components";
+const id="00000000-0000-4000-8000-000000000001";
+const payload=(read=false)=>({data:{unread:read?0:1,items:[{id,category:"payments",kind:"payment_confirmed",title:"Pago confirmado",message:"Consultá el pago",href:"/pagos",created_at:"2026-11-02T12:00:00Z",read_at:read?"2026-11-02T13:00:00Z":null}],preferences:{payments:true,expenses:true,groups:true,reminders:true,automatic:false,frequency:7}}});
+beforeEach(()=>{vi.resetAllMocks();mocks.inbox.mockResolvedValue(payload());mocks.read.mockResolvedValue({success:true});});
+it("updates unread counter without reloading and marks current user's notice",async()=>{const user=userEvent.setup();render(<NotificationsProvider><NotificationBell/><NotificationList/></NotificationsProvider>);await screen.findByRole("button",{name:"Notificaciones, 1 sin leer"});mocks.inbox.mockResolvedValue(payload(true));await user.click(screen.getByRole("button",{name:"Marcar como leída"}));await waitFor(()=>expect(screen.getByRole("button",{name:"Notificaciones"})).toBeVisible());expect(mocks.read).toHaveBeenCalledWith(id);});
+it("cleans timers and subscriptions when unmounted",async()=>{const add=vi.spyOn(window,"addEventListener"),remove=vi.spyOn(window,"removeEventListener");const view=render(<NotificationsProvider><NotificationList/></NotificationsProvider>);await screen.findByText("Pago confirmado");view.unmount();const count=mocks.inbox.mock.calls.length;await act(async()=>window.dispatchEvent(new Event("focus")));expect(mocks.inbox).toHaveBeenCalledTimes(count);expect(add).toHaveBeenCalledWith("focus",expect.any(Function));expect(remove).toHaveBeenCalledWith("focus",expect.any(Function));add.mockRestore();remove.mockRestore();});
