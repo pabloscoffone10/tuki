@@ -29,6 +29,10 @@ Reglas:
 | Production | Origen aprobado de producción presente; `NEXT_PUBLIC_SUPABASE_URL` debe coincidir con él; si se proporciona staging, debe ser distinto |
 | Local / Development | No se obliga a configurar la allowlist remota; se conserva el flujo local existente |
 
+En Preview y Production también es obligatoria la clave pública configurada; un
+valor ausente se rechaza antes del despliegue. Local conserva la validación diferida
+para poder trabajar sin conectar servicios. La clave nunca se imprime en errores.
+
 En Preview y Production también se exige `TUKI_SITE_URL` como origen HTTPS remoto,
 sin ruta, query, fragmentos ni credenciales. La comprobación no deriva destinos
 del header Host ni de una URL enviada por el usuario.

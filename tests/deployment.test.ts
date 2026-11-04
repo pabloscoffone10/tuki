@@ -3,6 +3,7 @@ import { expect,it } from "vitest";
 import { validateDeploymentEnvironment } from "@/lib/deployment";
 
 const approved = {
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_fixture",
   NEXT_PUBLIC_SUPABASE_URL: "https://staging-db.example",
   TUKI_STAGING_SUPABASE_ORIGIN: "https://staging-db.example/",
   TUKI_PRODUCTION_SUPABASE_ORIGIN: "https://production-db.example",
@@ -28,6 +29,9 @@ it("accepts Preview only for its approved staging origin with a different produc
 it("fails closed when Preview lacks an owner-approved environment allowlist",()=>{
   expect(()=>validateDeploymentEnvironment({...approved,VERCEL_ENV:"preview",TUKI_STAGING_SUPABASE_ORIGIN:undefined})).toThrow("TUKI_STAGING_SUPABASE_ORIGIN");
   expect(()=>validateDeploymentEnvironment({...approved,VERCEL_ENV:"preview",TUKI_PRODUCTION_SUPABASE_ORIGIN:undefined})).toThrow("TUKI_PRODUCTION_SUPABASE_ORIGIN");
+});
+it("requires the public authentication key in a deployed environment, while keeping local deferred configuration",()=>{
+ expect(()=>validateDeploymentEnvironment({...approved,VERCEL_ENV:"preview",NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:undefined})).toThrow("falta NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");expect(()=>validateDeploymentEnvironment({})).not.toThrow();
 });
 it("accepts Production only for its approved database and rejects a duplicated staging origin",()=>{
   const production={...approved,VERCEL_ENV:"production",NEXT_PUBLIC_SUPABASE_URL:approved.TUKI_PRODUCTION_SUPABASE_ORIGIN,TUKI_SITE_URL:"https://tuki.example"};

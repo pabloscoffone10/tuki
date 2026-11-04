@@ -5,7 +5,7 @@ Compartir, sin vueltas.
 Aplicación para organizar gastos compartidos entre amigos. Proyecto existente
 con Next.js 16 App Router, React 19, TypeScript estricto y Tailwind CSS 4.
 
-## Estado: Bloque 4 — PWA y preparación de beta (validación real pendiente)
+## Estado: Bloque 5 — validación de beta · NO-GO hasta aprobar controles reales
 
 Implementado: sistema visual con tokens, componentes shadcn/ui adaptados sobre
 Radix UI, iconos Lucide, navegación responsive, temas claro/oscuro/sistema con
@@ -87,6 +87,13 @@ SQL nuevo ni instala dependencias. La beta queda condicionada a concurrencia rea
 restauración aislada y verificación en staging y dispositivos.
 Ver [PWA, configuración y checklist de beta](docs/bloque-4-pwa-beta.md) y
 [PostgreSQL, auditoría de paquetes y backups](docs/bloque-4-operaciones.md).
+
+El **Bloque 5** restringe operaciones nuevas a **UYU** conservando historia
+multimoneda, agrega guardas de entorno y amplía la conciliación. Requiere revisar y
+aplicar manualmente la migración nueva **014**, después de 013. No se ejecutó SQL
+remoto ni despliegue. Concurrencia real, restore y dispositivos siguen pendientes:
+la decisión es **NO-GO**. Ver [informe de release y pasos manuales](docs/bloque-5-beta-release.md)
+y [escenarios funcionales y móviles](docs/beta-manual-testing.md).
 
 ## Requisitos e inicio local
 

@@ -25,7 +25,7 @@ export function ActionForm({ action, children, label, variant = "default" }: {
     <div aria-live="polite" className="space-y-2">
       {state.error && <p ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm leading-6 text-destructive">{state.error}</p>}
       {state.fields && Object.entries(state.fields).map(([key, errors]) => errors?.length ? <p key={key} className="text-xs text-destructive">{errors[0]}</p> : null)}
-      {state.success && <p role="status" className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm leading-6 text-primary">{state.success}</p>}
+      {state.success && <p role="status" className="rounded-lg border border-success/20 bg-success/5 p-3 text-sm leading-6 text-success">{state.success}</p>}
     </div>
     {state.invitationUrl && <div className="space-y-2 rounded-lg border bg-background p-3">
       <label className="block text-xs font-medium" htmlFor="generated-invitation">Enlace privado de un solo uso</label>

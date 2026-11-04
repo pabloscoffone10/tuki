@@ -33,6 +33,9 @@ export function validateDeploymentEnvironment(environment: DeploymentEnvironment
   }
   const stage = environment.VERCEL_ENV;
   if (stage !== "preview" && stage !== "production") return;
+  if (!environment.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim()) {
+    throw Error("deployment_configuration: falta NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY para este despliegue.");
+  }
   const production = httpsOrigin(environment.TUKI_PRODUCTION_SUPABASE_ORIGIN, "TUKI_PRODUCTION_SUPABASE_ORIGIN");
   const actual = httpsOrigin(environment.NEXT_PUBLIC_SUPABASE_URL, "NEXT_PUBLIC_SUPABASE_URL");
   httpsOrigin(environment.TUKI_SITE_URL, "TUKI_SITE_URL");

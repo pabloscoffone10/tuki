@@ -5,51 +5,55 @@
 
 :root {
   color-scheme: light;
-  --background: #fafaf8;
-  --foreground: #242b28;
+  --background: #f8f9fc;
+  --foreground: #242333;
   --card: #ffffff;
-  --card-foreground: #242b28;
-  --primary: #25634b;
+  --card-foreground: #242333;
+  --primary: #5b35df;
   --primary-foreground: #ffffff;
-  --secondary: #f0f2ed;
-  --secondary-foreground: #34483b;
-  --muted: #eff0ec;
-  --muted-foreground: #68716b;
-  --accent: #eef2ec;
-  --accent-foreground: #244b38;
+  --secondary: #f0eff5;
+  --secondary-foreground: #414052;
+  --muted: #f0f1f5;
+  --muted-foreground: #626277;
+  --accent: #eee9ff;
+  --accent-foreground: #4d2ac5;
   --popover: #ffffff;
-  --popover-foreground: #242b28;
-  --destructive: #ba3b3b;
-  --border: #e5e8e1;
-  --input: #dce1d7;
-  --ring: #428765;
-  --sidebar: #f5f6f2;
-  --hero: #edf2e8;
+  --popover-foreground: #242333;
+  --destructive: #bb343f;
+  --success: #18734a;
+  --success-foreground: #ffffff;
+  --border: #dedee8;
+  --input: #8d8b9f;
+  --ring: #6742df;
+  --sidebar: #f2f2f7;
+  --hero: #efedf8;
   --radius: 0.625rem;
 }
 
 .dark {
   color-scheme: dark;
-  --background: #151b18;
-  --foreground: #e9ede8;
-  --card: #1b231e;
-  --card-foreground: #e9ede8;
-  --primary: #9bd2af;
-  --primary-foreground: #142b1c;
-  --secondary: #25332a;
-  --secondary-foreground: #d3e5d8;
-  --muted: #28322b;
-  --muted-foreground: #a2afa5;
-  --accent: #29372d;
-  --accent-foreground: #d2e6d8;
-  --popover: #1b231e;
-  --popover-foreground: #e9ede8;
-  --destructive: #f09c9c;
-  --border: #303c33;
-  --input: #3f5044;
-  --ring: #9bd2af;
-  --sidebar: #18201b;
-  --hero: #233126;
+  --background: #131318;
+  --foreground: #ececf3;
+  --card: #1b1b23;
+  --card-foreground: #ececf3;
+  --primary: #aa98ff;
+  --primary-foreground: #1a103c;
+  --secondary: #252530;
+  --secondary-foreground: #dcdce8;
+  --muted: #24242e;
+  --muted-foreground: #aaa9bd;
+  --accent: #2c2542;
+  --accent-foreground: #d8cdff;
+  --popover: #1e1e28;
+  --popover-foreground: #ececf3;
+  --destructive: #ff9da5;
+  --success: #72dcaa;
+  --success-foreground: #102d20;
+  --border: #353541;
+  --input: #717083;
+  --ring: #aa98ff;
+  --sidebar: #17171e;
+  --hero: #211d31;
 }
 
 @theme inline {
@@ -68,6 +72,8 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

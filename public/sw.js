@@ -1,9 +1,9 @@
 /* Tuki caches public resources only. No background sync, tokens or financial queue. */
-const PUBLIC_CACHE = "tuki-public-v1";
+const PUBLIC_CACHE = "tuki-public-brand-v2";
 const OWNED_PREFIX = "tuki-public-";
 const OFFLINE_URL = "/offline.html";
 const ICON_PATHS = new Set([
-  "/icons/icon-192.png", "/icons/icon-512.png", "/icons/maskable-512.png", "/icons/apple-touch-icon.png",
+  "/icons/icon-192.png", "/icons/icon-512.png",
 ]);
 
 function canStore(response, immutable = false) {

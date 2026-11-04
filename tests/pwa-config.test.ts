@@ -9,8 +9,8 @@ import { config } from "@/proxy";
 it("provides stable standalone identity, root scope and real PNG icons including a safe maskable mark",async()=>{
  const data=manifest();expect(data).toMatchObject({id:"/",name:"Tuki",short_name:"Tuki",start_url:"/",scope:"/",display:"standalone"});
  for(const icon of data.icons??[]){const meta=await sharp(`public${icon.src}`).metadata();expect(`${meta.width}x${meta.height}`).toBe(icon.sizes);expect(meta.format).toBe("png");}
- const apple=await sharp("public/icons/apple-touch-icon.png").metadata();expect(apple.width).toBe(180);
- const corner=await sharp("public/icons/maskable-512.png").extract({left:0,top:0,width:1,height:1}).raw().toBuffer();expect([...corner.slice(0,3)]).toEqual([37,99,75]);
+ const apple=await sharp("public/icons/icon-192.png").metadata();expect(apple.width).toBe(192);
+ const corner=await sharp("public/icons/icon-512.png").extract({left:0,top:0,width:1,height:1}).raw().toBuffer();expect([...corner.slice(0,3)]).toEqual([91,53,233]);
 });
 it("serves PWA public assets without session refresh while protecting application routes",()=>{
  const matcher=new RegExp(`^${config.matcher[0]}$`);

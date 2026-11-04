@@ -23,10 +23,10 @@ async function handle(req:WorkerRequest){let response:Promise<Response>|undefine
 
 it("installs only the public recovery page and approved PNG icons without credentials",async()=>{
  fetcher.mockImplementation(async(path:string)=>publicResponse("public",path.endsWith(".png")?"image/png":"text/html","public, max-age=0"));await lifecycle("install");
- expect(stores.get("tuki-public-v1")?.size).toBe(5);expect(fetcher).toHaveBeenCalledWith("/offline.html",{credentials:"omit",cache:"reload"});expect(handlers.message).toBeUndefined();expect(handlers.sync).toBeUndefined();
+ expect(stores.get("tuki-public-brand-v2")?.size).toBe(3);expect(fetcher).toHaveBeenCalledWith("/offline.html",{credentials:"omit",cache:"reload"});expect(handlers.message).toBeUndefined();expect(handlers.sync).toBeUndefined();
 });
 it("refuses installation when the fallback forbids persistent caching",async()=>{
- fetcher.mockResolvedValue(publicResponse("private","text/html","private, no-store"));await expect(lifecycle("install")).rejects.toThrow("not cacheable");expect(stores.get("tuki-public-v1")?.size).toBe(0);
+ fetcher.mockResolvedValue(publicResponse("private","text/html","private, no-store"));await expect(lifecycle("install")).rejects.toThrow("not cacheable");expect(stores.get("tuki-public-brand-v2")?.size).toBe(0);
 });
 it("never intercepts mutation, Supabase, auth, RSC, prefetch, export or private receipt requests",async()=>{
  const paths=[request("/pagos",{method:"POST"}),request("https://project.supabase.co/rest/v1/payments"),request("/auth/callback"),request("/api/internal/reminders"),request("/grupos/id?_rsc=hash"),request("/grupos/id",{headers:new Headers({RSC:"1"})}),request("/grupos/id",{headers:new Headers({"Next-Router-Prefetch":"1"})}),request("/grupos/id",{headers:new Headers({"Next-Router-Segment-Prefetch":"/_tree"})}),request("/",{headers:new Headers({"Next-Action":"action"})}),request("/grupos/id/exportar"),request("/gastos/id/comprobante/r"),request("/gastos/id/ticket/r"),request("/private",{headers:new Headers({Authorization:"Bearer token"})})];
@@ -36,22 +36,22 @@ it("fetches full private documents from network every time and never stores them
  fetcher.mockImplementation(async()=>new Response("private account",{headers:{"cache-control":"private, no-store"}}));const req=request("/pagos",{mode:"navigate",destination:"document"});expect(await(await handle(req))?.text()).toBe("private account");expect(await(await handle(req))?.text()).toBe("private account");expect(fetcher).toHaveBeenCalledTimes(2);expect(stores.size).toBe(0);
 });
 it("uses only the public recovery page on failed full-document navigation, not server errors",async()=>{
- stores.set("tuki-public-v1",new Map([[key("/offline.html"),publicResponse("public offline","text/html","public")]]));fetcher.mockRejectedValueOnce(Error("offline"));expect(await(await handle(request("/grupos/id",{mode:"navigate",destination:"document"})))?.text()).toBe("public offline");fetcher.mockResolvedValueOnce(new Response("forbidden",{status:403}));expect((await handle(request("/grupos/id",{mode:"navigate",destination:"document"})))?.status).toBe(403);expect(stores.get("tuki-public-v1")?.size).toBe(1);
+ stores.set("tuki-public-brand-v2",new Map([[key("/offline.html"),publicResponse("public offline","text/html","public")]]));fetcher.mockRejectedValueOnce(Error("offline"));expect(await(await handle(request("/grupos/id",{mode:"navigate",destination:"document"})))?.text()).toBe("public offline");fetcher.mockResolvedValueOnce(new Response("forbidden",{status:403}));expect((await handle(request("/grupos/id",{mode:"navigate",destination:"document"})))?.status).toBe(403);expect(stores.get("tuki-public-brand-v2")?.size).toBe(1);
 });
 it("recovers ordinary filtered document URLs offline without storing their query or HTML",async()=>{
- stores.set("tuki-public-v1",new Map([[key("/offline.html"),publicResponse("public offline","text/html","public")]]));fetcher.mockRejectedValueOnce(Error("offline"));expect(await(await handle(request("/grupos/id?seccion=gastos",{mode:"navigate",destination:"document"})))?.text()).toBe("public offline");expect(stores.get("tuki-public-v1")?.size).toBe(1);expect(await handle(request("/_next/static/chunks/hash.js?v=1"))).toBeUndefined();
+ stores.set("tuki-public-brand-v2",new Map([[key("/offline.html"),publicResponse("public offline","text/html","public")]]));fetcher.mockRejectedValueOnce(Error("offline"));expect(await(await handle(request("/grupos/id?seccion=gastos",{mode:"navigate",destination:"document"})))?.text()).toBe("public offline");expect(stores.get("tuki-public-brand-v2")?.size).toBe(1);expect(await handle(request("/_next/static/chunks/hash.js?v=1"))).toBeUndefined();
 });
 it("revalidates unversioned public icons and removes old copies if caching is later forbidden",async()=>{
- const req=request("/icons/icon-192.png");fetcher.mockResolvedValueOnce(publicResponse("old","image/png","public, max-age=0"));await handle(req);fetcher.mockResolvedValueOnce(publicResponse("new","image/png","public, max-age=0"));expect(await(await handle(req))?.text()).toBe("new");expect(fetcher).toHaveBeenCalledTimes(2);fetcher.mockRejectedValueOnce(Error("offline"));expect(await(await handle(req))?.text()).toBe("new");fetcher.mockResolvedValueOnce(publicResponse("forbidden","image/png","private, no-store"));await handle(req);expect(stores.get("tuki-public-v1")?.has(key(req))).toBe(false);
+ const req=request("/icons/icon-192.png");fetcher.mockResolvedValueOnce(publicResponse("old","image/png","public, max-age=0"));await handle(req);fetcher.mockResolvedValueOnce(publicResponse("new","image/png","public, max-age=0"));expect(await(await handle(req))?.text()).toBe("new");expect(fetcher).toHaveBeenCalledTimes(2);fetcher.mockRejectedValueOnce(Error("offline"));expect(await(await handle(req))?.text()).toBe("new");fetcher.mockResolvedValueOnce(publicResponse("forbidden","image/png","private, no-store"));await handle(req);expect(stores.get("tuki-public-brand-v2")?.has(key(req))).toBe(false);
 });
 it("caches immutable public static files and reuses only those assets",async()=>{
- const req=request("/_next/static/chunks/hash.js");expect(await(await handle(req))?.text()).toBe("asset");expect(await(await handle(req))?.text()).toBe("asset");expect(fetcher).toHaveBeenCalledTimes(1);expect(stores.get("tuki-public-v1")?.size).toBe(1);
+ const req=request("/_next/static/chunks/hash.js");expect(await(await handle(req))?.text()).toBe("asset");expect(await(await handle(req))?.text()).toBe("asset");expect(fetcher).toHaveBeenCalledTimes(1);expect(stores.get("tuki-public-brand-v2")?.size).toBe(1);
 });
 it("does not store responses with private, no-store, cookie variance, wrong content or missing immutable",async()=>{
  for(const [index,response] of [publicResponse("private","text/javascript","private, immutable"),publicResponse("no","text/javascript","public, no-store, immutable"),publicResponse("html","text/html"),publicResponse("rsc","text/x-component"),publicResponse("dynamic","text/javascript","public, max-age=0"),new Response("vary",{headers:{"content-type":"text/javascript","cache-control":"public, immutable","vary":"Cookie"}})].entries()){
   fetcher.mockResolvedValueOnce(response);await handle(request(`/_next/static/chunks/${index}.js`));
- }expect(stores.get("tuki-public-v1")?.size).toBe(0);
+ }expect(stores.get("tuki-public-brand-v2")?.size).toBe(0);
 });
 it("activation deletes only obsolete Tuki public caches and never reloads clients",async()=>{
- stores.set("tuki-public-v0",new Map());stores.set("tuki-public-v1",new Map());stores.set("another-app",new Map());await lifecycle("activate");expect([...stores.keys()]).toEqual(["tuki-public-v1","another-app"]);expect(claim).toHaveBeenCalledTimes(1);
+ stores.set("tuki-public-v0",new Map());stores.set("tuki-public-brand-v2",new Map());stores.set("another-app",new Map());await lifecycle("activate");expect([...stores.keys()]).toEqual(["tuki-public-brand-v2","another-app"]);expect(claim).toHaveBeenCalledTimes(1);
 });

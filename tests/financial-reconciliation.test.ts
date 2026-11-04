@@ -26,7 +26,9 @@ beforeEach(async()=>{
  insert into payments values('${id(7)}',30000,'confirmed','${id(5)}','${id(6)}','${id(2)}','group',now(),'${id(6)}','counterparty');
  insert into payment_allocations values('${id(7)}','${id(4)}',30000,null,null);
  insert into payment_events values('${id(7)}','created'),('${id(7)}','confirm');`);
-});
+// Cold WASM startup can exceed 10s while the full SQL suite starts in parallel.
+// Match the explicit initialization budget of the other PGlite fixtures.
+},60000);
 afterEach(async()=>{await db?.close();});
 const issues=async()=>new Set((await db.query<{issue:string}>(sql)).rows.map(r=>r.issue));
 it("returns no issue for a balanced partial payment and cannot mutate data",async()=>{await db.exec("begin transaction read only");expect(await issues()).toEqual(new Set());await db.exec("rollback");expect((await db.query<{n:number}>("select count(*)::int n from payments")).rows[0].n).toBe(1);});
