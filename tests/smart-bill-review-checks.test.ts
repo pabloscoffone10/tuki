@@ -1,4 +1,4 @@
-import {expect,it} from "vitest";
+﻿import {expect,it} from "vitest";
 import {inspectLine,inspectReceiptDraft} from "@/features/smart-bills/review-checks";
 import type {SmartBill,SmartItem} from "@/features/smart-bills/domain";
 const id="00000000-0000-4000-8000-000000000001";
@@ -17,6 +17,7 @@ it("preserves subtotal discrepancies and never modifies the input",()=>{
  const result=inspectReceiptDraft(input,{},"5320");expect(result.difference).toBe(-10000n);expect(result.blocked).toBe(true);expect(JSON.stringify(input)).toBe(before);
 });
 it("does not infer missing quantities and refuses invalid optional printed values",()=>{
- expect(inspectLine(item({quantity:""})).net).toBeNull();
+ expect(inspectLine(item({quantity:""}))).toMatchObject({net:204000n,issue:expect.stringContaining("pendiente")});
  expect(inspectReceiptDraft(bill([item()]),{},"5.320,00").blocked).toBe(true);
 });
+

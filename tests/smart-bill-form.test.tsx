@@ -1,4 +1,4 @@
-import { render,screen,within } from "@testing-library/react";
+﻿import { render,screen,within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { it,expect,vi } from "vitest";
 const mocks=vi.hoisted(()=>({scan:vi.fn(async()=>({error:"not configured"})),ocr:vi.fn()}));
@@ -18,7 +18,7 @@ it("imports local OCR only after review without Gemini or automatic expense crea
  expect(JSON.parse((view.container.querySelector('[name="smartBill"]') as HTMLInputElement).value).items).toEqual([]);
  await user.selectOptions(screen.getByLabelText("Confirmar moneda del ticket"),"UYU");await user.click(importButton);
  const bill=JSON.parse((view.container.querySelector('[name="smartBill"]') as HTMLInputElement).value);
- expect(bill.items[0]).toMatchObject({name:"Agua",quantity:"1",price:"100.00",reviewed:true,consumers:[]});expect(bill.confirmed).toBe(false);expect(mocks.scan).not.toHaveBeenCalled();
+ expect(bill.items[0]).toMatchObject({name:"Agua",quantity:"",price:"100.00",reviewed:false,consumers:[]});expect(bill.confirmed).toBe(false);expect(mocks.scan).not.toHaveBeenCalled();
 });
 it("leaves the draft available after a local OCR failure without automatically using Gemini",async()=>{
  mocks.scan.mockClear();mocks.ocr.mockRejectedValue(Error("No se encontró texto legible"));
@@ -80,3 +80,4 @@ it("has only UYU on new accounts and refuses to relabel foreign scanned prices a
 it("preserves a historical foreign smart bill without exposing a currency or exchange selector",()=>{
  const bill={...draft(),currency:"USD" as const,rate:"40"},initial={currency:"USD",rate:"40.000000",payer_id:a,shares:[],title:"Histórico",notes:"",date:"2026-11-03",category:"food",version:1} as unknown as ExpenseDetail;const view=render(<SmartBillForm id={a} groupId={b} aiAvailable={false} people={people} bill={bill} initial={initial}/>);expect(serialized(view.container).currency).toBe("USD");expect(serialized(view.container).rate).toBe("40.000000");expect(screen.queryByLabelText("Moneda del ticket")).not.toBeInTheDocument();expect(screen.getByText(/Cuenta histórica en USD/)).toBeVisible();
 });
+

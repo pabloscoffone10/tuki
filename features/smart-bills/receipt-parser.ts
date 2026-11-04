@@ -37,6 +37,9 @@ export function parseReceiptAmount(input:string,separator?:DecimalSeparator):str
   const grouping=decimalMark===","?".":",";
   if(!new RegExp(`^\\d{1,3}(?:\\${grouping}\\d{3})+\\${decimalMark}\\d{2}$`).test(value))return null;
   normalized=value.split(grouping).join("").replace(decimalMark,".");
+ }else if(/^\d{1,3}(?:\.\d{3})+\.\d{2}$/.test(value)){
+  // Some thermal e-tickets print the same mark for grouping and cents: 1.525.00.
+  const last=value.lastIndexOf(".");normalized=value.slice(0,last).replaceAll(".","")+value.slice(last);
  }else if(/^\d+[.,]\d{2}$/.test(value))normalized=value.replace(",",".");
  else if(/^\d+$/.test(value))normalized=`${value}.00`;
  else {
@@ -88,6 +91,7 @@ export function parseReceiptDocument(text:string,ocrLines?:ReceiptOcrLine[]):{ex
  const extraction:Extraction={currency:null,total:null,items:[],adjustments:[],warnings:[],complete:false};
  const analysis:ReceiptAnalysis={items:[],totals:{subtotal:null,itemsSum:"0.00",subtotalDifference:null,calculatedTotal:null,totalDifference:null},merchant:null,date:null,issues:[],totalConfidence:"missing",blocked:false};
  const lines=positionalLines(bounded,ocrLines),totals:string[]=[],subtotals:string[]=[],adjustmentKeys=new Set<string>();
+ const currencyHeader=lines.findIndex(line=>/^MONEDA\s*[:;]?\s*(?:UYU|USD|EUR)\b/i.test(line.text));
  const currencyCodes=[...new Set([...(bounded.match(/\b(?:UYU|USD|EUR|ARS|BRL|MXN)\b/gi)??[]).map(code=>code.toUpperCase()),...(/pesos uruguayos|\$\s*U\b|\bU\$/i.test(bounded)?["UYU"]:[]),...(/US\$|U\$S/i.test(bounded)?["USD"]:[])])];
  if(currencyCodes.length===1)extraction.currency=currencyCodes[0];
  const date=bounded.match(/\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b/);
@@ -99,6 +103,7 @@ export function parseReceiptDocument(text:string,ocrLines?:ReceiptOcrLine[]):{ex
  let pendingDetail:{quantity:string;unit:NumberFact;source:number[]}|null=null;
  let totalsStarted=false;
  let totalOcrHigh=true;
+ const includedTaxes:string[]=[];
  const issue=(message:string)=>{if(!analysis.issues.includes(message))analysis.issues.push(message);};
  function addItem(name:string,quantity:string|null,unit:NumberFact|undefined,subtotal:NumberFact|undefined,source:Line[]){
   name=name.replace(/^[-•*]+\s*/,"").replace(/[:=]+$/g,"").trim();
@@ -113,18 +118,20 @@ export function parseReceiptDocument(text:string,ocrLines?:ReceiptOcrLine[]):{ex
   extraction.items.push(item);analysis.items.push(evidence);
  }
  for(let index=0;index<lines.length;index++){
-  const line=lines[index],clean=line.text.replace(/[×✕]/g,"x").replace(/\s+/g," ").trim();
+  const line=lines[index],clean=line.text.replace(/[×✕]/g,"x").replace(/(\d)\s+([.,])(?=\d{2}\b)/g,"$1$2").replace(/\s+/g," ").trim().replace(/^[|N]\s+(?=(?:SUBTOTAL|IVA)\s*[:$])/i,"");
   if(!clean)continue;
+  if(currencyHeader>=0&&index<currencyHeader)continue;
   const numbers=facts(clean,separator),last=numbers.at(-1),ends=last&&/^[\s.:]*$/.test(clean.slice(last.end));
   if(/^(?:SUB\s*TOTAL)(?:\s+IMPRESO)?\b/i.test(clean)){
    if(ends&&last.value)subtotals.push(last.value);pending=[];pendingDetail=null;continue;
   }
-  if(/^(?:TOTAL(?:\s+(?:A\s+PAGAR|CONTADO|FINAL|GENERAL|IMPRESO))?|IMPORTE\s+TOTAL|A\s+PAGAR)\b/i.test(clean)){
+  if(/^(?:TOTAL(?:\s+(?:A\s+PAGAR|CONTADO|FINAL|GENERAL|IMPRESO))?|IMPORTE\s+TOTAL|A\s+PAGAR)\b/i.test(clean)||/^\d+\s+art[íi]culos\s+TOTAL\b/i.test(clean)){
    if(ends&&last.value){totals.push(last.value);totalOcrHigh=totalOcrHigh&&(line.confidence??0)>=75;}else issue("El total impreso no se reconoció de forma inequívoca.");pending=[];pendingDetail=null;totalsStarted=true;continue;
   }
   const adjustmentKind=/^(?:descuento|bonificaci[óo]n|dto)\b/i.test(clean)?"discount":/^(?:propina|tip)\b/i.test(clean)?"tip":/^(?:servicio(?: de mesa| adicional)?|cargo|recargo|cubierto adicional)(?=\s*[:$\d]|$)/i.test(clean)?"service":/^redondeo\b/i.test(clean)?"rounding":null;
   const tax=/^(?:IVA|I\.V\.A\.?|IMPUESTO|TAX)\b/i.test(clean);
   if(adjustmentKind||tax){
+   if(tax&&ends&&last?.value&&!/adicional|no\s+incluid|extra/i.test(clean))includedTaxes.push(last.value);
    const included=!/no\s+incluid/i.test(clean)&&/incluid[oa]|incl\.?\b/i.test(clean);
    if(tax&&included){issue("Impuesto incluido: no se suma nuevamente al gasto.");pending=[];continue;}
    if(tax&&!/adicional|no\s+incluid|extra/i.test(clean)){issue("Revisá manualmente si el impuesto está incluido; no se agregó automáticamente.");pending=[];continue;}
@@ -138,6 +145,22 @@ export function parseReceiptDocument(text:string,ocrLines?:ReceiptOcrLine[]):{ex
   }
   if(isReceiptMetadata(clean)||metadata.test(clean)||/^(?:mozo|mesero|camarero|vendedor)\s*:?\s+[^$]+$/i.test(clean)||/^(?:(?:UYU|USD|EUR|ARS|BRL|MXN)\s*)+$/i.test(clean)){pending=[];pendingDetail=null;continue;}
   if(totalsStarted)continue;
+  // Some POS receipts print quantity, unit price, amount, then product name.
+  const nameLast=clean.match(/^(\d{1,4})\s+(\d+(?:[.,]\d{2})?)\s+(\d+(?:[.,]\d{2})?)\s+([a-záéíóúñ].*)$/i);
+  if(nameLast){
+   const values=facts(clean,separator);
+   addItem(nameLast[4],nameLast[1],values[1],values[2],[line]);pending=[];pendingDetail=null;continue;
+  }
+  // Uruguayan e-tickets place quantity UN X unit price BELOW the line amount.
+  const detail=clean.match(/^(\d{1,12}(?:[.,]\d{1,4})?)\s*UN\s+X\s+(\d+(?:[.,]\d{2})?)$/i);
+  if(detail){
+   const previous=extraction.items.at(-1),evidence=analysis.items.at(-1),unit=facts(detail[2],separator)[0];
+   if(previous&&evidence&&previous.quantity===null){
+    previous.quantity=detail[1].replace(",",".");previous.unitPrice=unit?.value??null;
+    evidence.sourceLines.push(...line.source);evidence.fields.quantity="review";evidence.fields.unitPrice=unit?.value?"review":"missing";
+   }else issue("Hay un detalle de cantidad sin producto asociado. Revisá la foto.");
+   pending=[];pendingDetail=null;continue;
+  }
   const multiplication=clean.match(/(?:^|\s)(\d{1,12}(?:[.,]\d{1,4})?)\s*[x@]\s*/i);
   if(multiplication){
    const quantity=multiplication[1].replace(",","."),before=clean.slice(0,multiplication.index).trim().replace(/[:=]+$/g,"").trim();
@@ -190,6 +213,11 @@ export function parseReceiptDocument(text:string,ocrLines?:ReceiptOcrLine[]):{ex
   }
  });
  analysis.totals.itemsSum=decimal(sum);
+ // A net subtotal plus the printed included IVA is not a gross product subtotal.
+ if(analysis.totals.subtotal&&includedTaxes.length&&sum===cents(analysis.totals.subtotal)+includedTaxes.reduce((total,value)=>total+cents(value),0n)){
+  issue(`Subtotal neto ${analysis.totals.subtotal}: el IVA ya está incluido en los productos; no se suma otra vez.`);
+  analysis.totals.subtotal=null;
+ }
  if(analysis.totals.subtotal&&allAmounts){const difference=sum-cents(analysis.totals.subtotal);analysis.totals.subtotalDifference=decimal(difference);if(difference!==0n){issue(`Suma de productos ${decimal(sum)}; subtotal impreso ${analysis.totals.subtotal}; diferencia ${decimal(difference)}. Revisá productos omitidos o mal leídos.`);analysis.blocked=true;}}
  const calculated=applyAdjustments(sum,extraction.adjustments);
  if(allAmounts){analysis.totals.calculatedTotal=decimal(calculated);if(extraction.total){const difference=calculated-cents(extraction.total);analysis.totals.totalDifference=decimal(difference);if(difference!==0n){issue(`Total calculado ${decimal(calculated)}; total impreso ${extraction.total}; diferencia ${decimal(difference)}.`);analysis.blocked=true;}}}

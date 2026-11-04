@@ -29,17 +29,17 @@ export function importGroupedReceipt(data:Extraction){
     if(raw.uncertain)doubtfulIds.push(previous.id);continue;
    }
   }
-  const item:SmartItem={id:crypto.randomUUID(),name:raw.name??"",quantity,priceMode:"subtotal",price:total,discount:raw.discount??"0",split:"equal",consumers:[],reviewed:!!raw.name&&total!==""};
+  const item:SmartItem={id:crypto.randomUUID(),name:raw.name??"",quantity:raw.quantity??"",priceMode:"subtotal",price:total,discount:raw.discount??"0",split:"equal",consumers:[],reviewed:!!raw.name&&total!==""&&raw.quantity!==null};
   items.push(item);if(key)compatible.set(key,item);
   // With unknown quantity, the subtotal is sufficient. Do not invent a unit price.
-  if(raw.quantity&&raw.unitPrice)evidence[item.id]={unitPrice:raw.unitPrice,subtotal:total};
+  evidence[item.id]={unitPrice:raw.unitPrice??"",subtotal:total};
   if(raw.uncertain||!consistent)doubtfulIds.push(item.id);
  }
- const converted=fixedAdjustments(items,data.adjustments.map(a=>({id:crypto.randomUUID(),label:a.label,kind:a.kind,mode:a.amount!==null?"fixed":"percent",value:a.amount??a.percent??"",subtract:a.subtract,included:a.included??false,distribution:"proportional",consumers:[],reviewed:true})) as Adjustment[]);
+ const converted=fixedAdjustments(items,data.adjustments.map(a=>({id:crypto.randomUUID(),label:a.label,kind:a.kind,mode:a.amount!==null?"fixed":"percent",value:a.amount??a.percent??"",subtract:a.subtract,included:a.included??false,distribution:"equal",consumers:[],reviewed:true})) as Adjustment[]);
  const adjustments:Adjustment[]=[];
  for(const a of converted){
-  if(a.kind==="service"&&cover(a.label)){
-   if(items.some(item=>cover(item.name)))throw Error("Los cubiertos aparecen como producto y como cargo. Revisá el ticket para no contarlos dos veces.");
+  if(a.kind==="service"){
+   if(cover(a.label)&&items.some(item=>cover(item.name)))throw Error("Los cubiertos aparecen como producto y como cargo. Revisá el ticket para no contarlos dos veces.");
    if(a.mode!=="fixed")throw Error("Revisá el importe de los cubiertos antes de importar.");
    if(minor(a.value)>0n)items.push({id:a.id,name:a.label,quantity:"1",priceMode:"subtotal",price:a.value,discount:"0",split:"equal",consumers:[],reviewed:true});
   }else adjustments.push(a);

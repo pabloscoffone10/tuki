@@ -91,6 +91,14 @@ export async function prepareReceiptImage(file:File,signal?:AbortSignal){
    if(!ctx)throw Error("No se pudo comprobar la orientación.");
    ctx.translate(rotated.width/2,rotated.height/2);ctx.rotate(degrees*Math.PI/180);ctx.drawImage(original,-original.width/2,-original.height/2);return rotated;
   };
-  return {original,quality,enhance,rotate,release:()=>{for(const value of canvases){value.width=1;value.height=1;}}};
+  const crop=(box:{x0:number;y0:number;x1:number;y1:number},scaleX=2,scaleY=2)=>{
+   const x0=Math.max(0,Math.floor(box.x0)),y0=Math.max(0,Math.floor(box.y0));
+   const width=Math.min(original.width,Math.ceil(box.x1))-x0,height=Math.min(original.height,Math.ceil(box.y1))-y0;
+   if(width<=0||height<=0)throw Error("El recorte OCR no tiene dimensiones válidas.");
+   const cropped=canvas(width*scaleX,height*scaleY),ctx=cropped.getContext("2d");
+   if(!ctx)throw Error("No se pudo comprobar el recorte del ticket.");
+   ctx.drawImage(original,x0,y0,width,height,0,0,cropped.width,cropped.height);return cropped;
+  };
+  return {original,quality,enhance,rotate,crop,release:()=>{for(const value of canvases){value.width=1;value.height=1;}}};
  }catch(error){image.close();for(const value of canvases){value.width=1;value.height=1;}throw error;}
 }

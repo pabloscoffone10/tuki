@@ -124,3 +124,11 @@ it("preserves real repeated charges before the total while deduplicating a repea
  const {extraction,analysis}=parseReceiptDocument("Agua 100,00\nDescuento 5,00\nDescuento 5,00\nTOTAL 90,00\nDescuento 5,00\nTOTAL 90,00");
  expect(extraction.adjustments).toHaveLength(2);expect(analysis.totals.totalDifference).toBe("0.00");
 });
+
+it("reads Uruguayan thermal totals with repeated decimal marks without changing digits",()=>{
+ expect(parseReceiptAmount("5.320.00")).toBe("5320.00");expect(parseReceiptAmount("1.525.00")).toBe("1525.00");expect(parseReceiptAmount("5.32000")).toBeNull();
+});
+it("accepts MONEDA semicolon and attached UN details without turning RUT into a product",()=>{
+ const result=parseReceiptText("BACAR S.A 211430680013\nMONEDA; UYU\nJugo 268.00\n2.00UN X 134.00\nTOTAL 268.00");
+ expect(result.items).toHaveLength(1);expect(result.items[0]).toMatchObject({quantity:"2.00",unitPrice:"134.00",subtotal:"268.00"});
+});

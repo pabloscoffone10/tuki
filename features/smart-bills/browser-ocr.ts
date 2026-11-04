@@ -1,10 +1,10 @@
 "use client";
 import type { Page,PSM } from "tesseract.js";
-import { parseReceiptDocument,type ReceiptOcrLine } from "./receipt-parser";
+import { parseReceiptAmount,parseReceiptDocument,type ReceiptOcrLine } from "./receipt-parser";
 import { prepareReceiptImage } from "./receipt-image";
 
 export type LocalReceiptResult=ReturnType<typeof parseReceiptDocument>&{text:string;qualityWarnings:string[];selectedVariant:string;candidateCount:number;reused?:boolean};
-type Candidate=LocalReceiptResult&{confidence:number};
+type Candidate=LocalReceiptResult&{confidence:number;lines:ReceiptOcrLine[]};
 let cached:{hash:string;result:LocalReceiptResult}|undefined;
 let fallbackCache=new WeakMap<File,LocalReceiptResult>();
 
@@ -19,8 +19,8 @@ function linesFromPage(page:Page):ReceiptOcrLine[]{
  }));
 }
 function candidateFromPage(page:Page,variant:string):Candidate{
- const text=page.text.slice(0,60000),parsed=parseReceiptDocument(text,linesFromPage(page));
- return {...parsed,text,qualityWarnings:[],selectedVariant:variant,candidateCount:1,confidence:Number.isFinite(page.confidence)?page.confidence:0};
+ const text=page.text.slice(0,60000),lines=linesFromPage(page),parsed=parseReceiptDocument(text,lines);
+ return {...parsed,text,lines,qualityWarnings:[],selectedVariant:variant,candidateCount:1,confidence:Number.isFinite(page.confidence)?page.confidence:0};
 }
 function score(candidate:Candidate){
  const totals=candidate.analysis.totals;
@@ -33,6 +33,7 @@ function selectCandidate(candidates:Candidate[]){
  return candidates.reduce((best,current)=>{
   // A superficially tidy short reading must not replace a more complete ticket.
   if(baseline.extraction.items.length>=3&&current.extraction.items.length<baseline.extraction.items.length*0.75)return best;
+  if(baseline.extraction.total&&baseline.analysis.totals.totalDifference==="0.00"&&!current.extraction.total)return best;
   return score(current)>score(best)+2?current:best;
  },baseline);
 }
@@ -100,9 +101,74 @@ export async function readTicketLocally(file:File,onProgress:(progress:number)=>
    try{candidates.push(await recognize(prepared.rotate(angle),`Orientación ${angle}°`,PSM.SINGLE_COLUMN));}
    catch(error){if(stopped||signal?.aborted)throw error;quality.warnings.push("No se pudo comparar otra orientación. Podés girar la foto y reintentar.");}
   }
-  const selected=selectCandidate(candidates);
+  let selected=selectCandidate(candidates);
   if(!selected.text.trim())throw Error("No se encontró texto legible. Probá con otra foto, carga manual o Gemini opcional.");
   const warnings=[...quality.warnings];
+  // Re-read bounded regions of the ORIGINAL pixels. Never repair a number from a sum.
+  const original=candidates[0];
+  const focused=async(box:{x0:number;y0:number;x1:number;y1:number},psm:PSM,scaleY=2)=>{
+   if(stopped)throw abortError();
+   await created.setParameters({tessedit_pageseg_mode:psm,preserve_interword_spaces:"1"});
+   const {data}=await created.recognize(prepared!.crop(box,2,scaleY),{rotateAuto:false},{text:true,blocks:true});
+   if(stopped)throw abortError();return data;
+  };
+  try{
+   const totalLines=original.lines.filter(line=>/\bTOTAL\b/i.test(line.text)&&!/^\s*SUB/i.test(line.text)&&line.bbox);
+   const totalLine=totalLines.length===1?totalLines[0]:undefined;
+   if(totalLine?.bbox&&(!selected.extraction.total||selected.analysis.totals.totalDifference!=="0.00")){
+    const box=totalLine.bbox,h=box.y1-box.y0,label=totalLine.words?.find(word=>/^TOTAL\W*$/i.test(word.text));
+    const region={x0:label?.bbox?label.bbox.x1+h*0.1:Math.max(box.x0,prepared.original.width*0.6),x1:Math.min(prepared.original.width,box.x1+h*0.7),y0:box.y0-h*0.4,y1:box.y1+h*0.3};
+    const values:string[]=[];
+    for(const psm of [PSM.SINGLE_LINE,PSM.SINGLE_BLOCK]){
+     // Tall total fonts need wider glyphs; the amount itself is still recognized.
+     const page=await focused(region,psm,0.5);
+     const tokens=page.text.match(/\d+(?:[.,]\d+)*/g)??[];
+     if(tokens.length===1){const value=parseReceiptAmount(tokens[0]);if(value&&page.confidence>=40)values.push(value);}
+    }
+    if(values.length===2&&values[0]===values[1]&&values[0]!==selected.extraction.total){
+     const lines=selected.lines.map(line=>/\bTOTAL\b/i.test(line.text)&&!/^\s*SUB/i.test(line.text)?{...line,text:`TOTAL ${values[0]}`,confidence:0}:line);
+     const text=lines.map(line=>line.text).join("\n"),parsed=parseReceiptDocument(text,lines);
+     warnings.push(`El recorte del total reconoció ${values[0]} en dos lecturas. La lectura general era ${selected.extraction.total??"ilegible"}; revisá el total con la foto.`);
+     selected={...selected,...parsed,lines,text};
+    }
+   }
+   let attempts=0;
+   for(const [index,item] of selected.extraction.items.entries()){
+    if(attempts>=5)break;
+    if(item.quantity!==null&&item.unitPrice!==null||!item.subtotal)continue;
+    const identity=(name:string|null)=>(name??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    const alternatives=candidates.filter(candidate=>candidate!==selected).flatMap(candidate=>candidate.extraction.items.filter(value=>identity(value.name)===identity(item.name)&&value.subtotal===item.subtotal&&value.quantity&&value.unitPrice));
+    const unique=new Map(alternatives.map(value=>[`${value.quantity}:${value.unitPrice}`,value]));
+    const alternate=unique.size===1?[...unique.values()][0]:undefined;
+    if(alternate?.quantity&&alternate.unitPrice){
+     const [whole,fraction=""]=alternate.quantity.split("."),q=BigInt(whole)*10000n+BigInt(fraction.padEnd(4,"0"));
+     if(q>0n&&(q*BigInt(alternate.unitPrice.replace(".",""))+5000n)/10000n===BigInt(item.subtotal.replace(".",""))&&(item.quantity===null||Number(item.quantity)===Number(alternate.quantity))&&(item.unitPrice===null||item.unitPrice===alternate.unitPrice)){
+      item.quantity=alternate.quantity;item.unitPrice=alternate.unitPrice;
+      selected.analysis.items[index].fields.quantity="review";selected.analysis.items[index].fields.unitPrice="review";
+      warnings.push(`Otra lectura de la misma fila reconoció cantidad y precio de «${item.name}»; revisalos con la foto.`);continue;
+     }
+    }
+    const matches=original.extraction.items.map((value,index)=>({value,index})).filter(({value})=>value.subtotal===item.subtotal);
+    if(matches.length!==1)continue;
+    const sourceIndex=matches[0].index,sources=original.analysis.items[sourceIndex].sourceLines;
+    const boxes=sources.map(source=>original.lines[source]?.bbox).filter((box):box is NonNullable<typeof box>=>!!box);
+    if(!boxes.length)continue;
+    const nextSources=original.analysis.items[sourceIndex+1]?.sourceLines??[],nextTop=Math.min(...nextSources.map(source=>original.lines[source]?.bbox?.y0??Infinity));
+    const top=Math.min(...boxes.map(box=>box.y0)),bottom=Math.max(...boxes.map(box=>box.y1)),height=bottom-top;
+    const region={x0:0,x1:prepared.original.width,y0:top-Math.max(8,height*0.3),y1:Math.min(nextTop+height*0.7,bottom+Math.max(30,height*2))};
+    attempts++;
+    const page=await focused(region,PSM.SINGLE_BLOCK);
+    const details=[...page.text.matchAll(/\b(\d+(?:[.,]\d{1,4})?)\s*UN\s+X\s+(\d+(?:[.,]\d{2})?)\b/gi)];
+    if(details.length!==1)continue;
+    const quantity=details[0][1].replace(",","."),unit=parseReceiptAmount(details[0][2]);
+    if(!unit||item.quantity!==null&&Number(item.quantity)!==Number(quantity)||item.unitPrice!==null&&item.unitPrice!==unit)continue;
+    const [whole,fraction=""]=quantity.split("."),q=BigInt(whole)*10000n+BigInt(fraction.padEnd(4,"0"));
+    if(q<=0n||(q*BigInt(unit.replace(".",""))+5000n)/10000n!==BigInt(item.subtotal.replace(".","")))continue;
+    item.quantity=quantity;item.unitPrice=unit;
+    const evidence=selected.analysis.items[index];evidence.fields.quantity="review";evidence.fields.unitPrice="review";
+    warnings.push(`Cantidad y precio de «${item.name}» recuperados del recorte de su fila; revisalos con la foto.`);
+   }
+  }catch(error){if(stopped||signal?.aborted)throw error;warnings.push("No se completó la comprobación por recortes. Los datos ilegibles quedan pendientes de corrección.");}
   const facts=(candidate:Candidate)=>JSON.stringify({total:candidate.extraction.total,items:candidate.extraction.items.map(item=>[item.name,item.quantity,item.unitPrice,item.subtotal])});
   const disagreement=candidates.some(candidate=>candidate!==selected&&candidate.extraction.items.length>0&&facts(candidate)!==facts(selected));
   if(disagreement){

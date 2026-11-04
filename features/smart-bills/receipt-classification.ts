@@ -2,6 +2,9 @@
 export function isReceiptMetadata(value:string){
  const text=value.trim().replace(/\s+/g," ");
  return /^(?:mesa|comensales|personas|pax)\s*(?::|#|n[\u00ba\u00b0o.]*)?\s*\d+\s*$/i.test(text)
+  || /^(?:N[.\s-]*I[.\s-]*F\b|identificador\s*:|sala-mesa\s*:|consumo final\b|\(?\s*original\s*\)|serie\s*:|nro\s*:)/i.test(text)
+  || /^nov\.\s+\d+\s+20\d{2}\b/i.test(text)
+  || /^(?:I\.?V\.?A\.?|impuestos?|base imponible|neto|exento)\b/i.test(text)
   || /^(?:mesa|comensales|mozo|mesero|camarero|vendedor|folio|factura|ticket|rut|ruc|fecha|hora|terminal|autorizaci[oó]n)$/i.test(text)
   || /^(?:mozo|mesero|camarero|vendedor)\s*:\s*.+$/i.test(text)
   || /^(?:folio|factura|ticket|terminal|autorizaci[oó]n|c[oó]digo de autorizaci[oó]n)\s*(?::|#|n[\u00ba\u00b0o.]*)?\s*[\d-]+\s*$/i.test(text)

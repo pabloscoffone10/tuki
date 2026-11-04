@@ -1,6 +1,6 @@
-import {afterEach,beforeEach,expect,it,vi} from "vitest";
-const mocks=vi.hoisted(()=>({create:vi.fn(),recognize:vi.fn(),terminate:vi.fn(),prepare:vi.fn(),release:vi.fn(),enhance:vi.fn(),rotate:vi.fn(),parameters:vi.fn()}));
-vi.mock("tesseract.js",()=>({createWorker:mocks.create,PSM:{SINGLE_COLUMN:"4",SINGLE_BLOCK:"6"}}));
+﻿import {afterEach,beforeEach,expect,it,vi} from "vitest";
+const mocks=vi.hoisted(()=>({create:vi.fn(),recognize:vi.fn(),terminate:vi.fn(),prepare:vi.fn(),release:vi.fn(),enhance:vi.fn(),rotate:vi.fn(),parameters:vi.fn(),crop:vi.fn()}));
+vi.mock("tesseract.js",()=>({createWorker:mocks.create,PSM:{SINGLE_COLUMN:"4",SINGLE_BLOCK:"6",SINGLE_LINE:"7"}}));
 vi.mock("@/features/smart-bills/receipt-image",async original=>{
  const actual=await original<typeof import("@/features/smart-bills/receipt-image")>();
  return {...actual,prepareReceiptImage:mocks.prepare};
@@ -15,8 +15,8 @@ const image=()=>({width:1000,height:2000} as HTMLCanvasElement);
 beforeEach(()=>{
  vi.resetAllMocks();clearLocalOcrCache();
  mocks.create.mockResolvedValue({recognize:mocks.recognize,terminate:mocks.terminate,setParameters:mocks.parameters});mocks.recognize.mockResolvedValue(page());
- mocks.enhance.mockResolvedValue(image());mocks.rotate.mockReturnValue(image());
- mocks.prepare.mockResolvedValue({original:image(),quality:quality(),enhance:mocks.enhance,rotate:mocks.rotate,release:mocks.release});
+ mocks.enhance.mockResolvedValue(image());mocks.rotate.mockReturnValue(image());mocks.crop.mockReturnValue(image());
+ mocks.prepare.mockResolvedValue({original:image(),crop:mocks.crop,quality:quality(),enhance:mocks.enhance,rotate:mocks.rotate,release:mocks.release});
 });
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
 it("runs bounded Spanish/English recognition with geometry and frees resources",async()=>{
@@ -67,4 +67,35 @@ it("describes low-light/low-detail image evidence without pretending to measure 
  const pixels=new Uint8ClampedArray(100*100*4);for(let i=0;i<10000;i++){pixels[i*4]=pixels[i*4+1]=pixels[i*4+2]=45;pixels[i*4+3]=255;}
  const measured=measureReceiptImage(pixels,100,100,500);
  expect(measured).toMatchObject({dark:true,lowContrast:true,possiblyBlurred:true,small:true});expect(measured.warnings.join(" ")).not.toContain("%");
+});
+
+
+const totalPhoto=()=>{
+ const value="MONEDA UYU\nAgua 1 x 1000 1000\nPan 1 x 4320 4320\nTOTAL 0.320,00";
+ const lines=value.split("\n").map((text,index)=>({text,confidence:90,bbox:{x0:20,y0:100+index*100,x1:900,y1:150+index*100},words:text.startsWith("TOTAL")?[{text:"TOTAL",bbox:{x0:300,y0:400,x1:500,y1:450}}]:[]}));
+ return {data:{text:value,confidence:90,blocks:[{paragraphs:[{lines}]}]}};
+};
+it("reads the tall total from original pixels twice, without using the items sum or payment",async()=>{
+ mocks.recognize.mockResolvedValueOnce(totalPhoto()).mockResolvedValueOnce(totalPhoto()).mockResolvedValueOnce(page("£$ 5.320.00 M",76)).mockResolvedValueOnce(page("£$ 5.320.00 M",76));
+ const result=await readTicketLocally(photo(),()=>{});
+ expect(result.extraction.total).toBe("5320.00");expect(result.analysis.totals.totalDifference).toBe("0.00");
+ expect(result.text).toContain("TOTAL 5320.00");expect(result.qualityWarnings.join(" ")).toContain("dos lecturas");
+ expect(mocks.crop).toHaveBeenCalledWith(expect.anything(),2,0.5);
+ expect(mocks.recognize).toHaveBeenLastCalledWith(expect.anything(),{rotateAuto:false},{text:true,blocks:true});
+});
+it("does not pick a focused total merely because it matches the calculated sum",async()=>{
+ mocks.recognize.mockResolvedValueOnce(totalPhoto()).mockResolvedValueOnce(totalPhoto()).mockResolvedValueOnce(page("5.320,00",80)).mockResolvedValueOnce(page("6.320,00",80));
+ const result=await readTicketLocally(photo(),()=>{});expect(result.extraction.total).toBe("0320.00");expect(result.extraction.adjustments).toEqual([]);
+});
+it("recovers missing quantity and unit price from a crop, but never derives either from its subtotal",async()=>{
+ const value="MONEDA UYU\nJugo 268.00\nPan 1 x 50 50\nTOTAL 318.00";
+ const lines=value.split("\n").map((text,index)=>({text,confidence:90,bbox:{x0:20,y0:100+index*100,x1:900,y1:150+index*100},words:[]}));
+ mocks.recognize.mockResolvedValueOnce({data:{text:value,confidence:90,blocks:[{paragraphs:[{lines}]}]}}).mockResolvedValueOnce(page("Jugo 268.00\n2.00 UN X 134.00",85));
+ const result=await readTicketLocally(photo(),()=>{});expect(result.extraction.items[0]).toMatchObject({quantity:"2.00",unitPrice:"134.00",subtotal:"268.00"});expect(result.analysis.items[0].fields.quantity).toBe("review");
+});
+it("keeps unknown quantity and unit price pending when the crop has no readable detail",async()=>{
+ const value="MONEDA UYU\nJugo 268.00\nTOTAL 268.00";
+ const lines=value.split("\n").map((text,index)=>({text,confidence:90,bbox:{x0:20,y0:100+index*100,x1:900,y1:150+index*100},words:[]}));
+ mocks.recognize.mockResolvedValueOnce({data:{text:value,confidence:90,blocks:[{paragraphs:[{lines}]}]}}).mockResolvedValueOnce(page("Jugo 268.00",85));
+ const result=await readTicketLocally(photo(),()=>{});expect(result.extraction.items[0]).toMatchObject({quantity:null,unitPrice:null,subtotal:"268.00"});
 });
