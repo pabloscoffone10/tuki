@@ -1,3 +1,4 @@
+import {isReceiptMetadata} from "./receipt-classification";
 import type { Extraction } from "./extraction-schema";
 
 export type FieldConfidence="high"|"review"|"missing";
@@ -121,7 +122,7 @@ export function parseReceiptDocument(text:string,ocrLines?:ReceiptOcrLine[]):{ex
   if(/^(?:TOTAL(?:\s+(?:A\s+PAGAR|CONTADO|FINAL|GENERAL|IMPRESO))?|IMPORTE\s+TOTAL|A\s+PAGAR)\b/i.test(clean)){
    if(ends&&last.value){totals.push(last.value);totalOcrHigh=totalOcrHigh&&(line.confidence??0)>=75;}else issue("El total impreso no se reconoció de forma inequívoca.");pending=[];pendingDetail=null;totalsStarted=true;continue;
   }
-  const adjustmentKind=/descuento|bonificaci[óo]n|\bdto\b/i.test(clean)?"discount":/propina|\btip\b/i.test(clean)?"tip":/servicio|cargo|recargo|cubierto\s+adicional/i.test(clean)?"service":/redondeo/i.test(clean)?"rounding":null;
+  const adjustmentKind=/^(?:descuento|bonificaci[óo]n|dto)\b/i.test(clean)?"discount":/^(?:propina|tip)\b/i.test(clean)?"tip":/^(?:servicio(?: de mesa| adicional)?|cargo|recargo|cubierto adicional)(?=\s*[:$\d]|$)/i.test(clean)?"service":/^redondeo\b/i.test(clean)?"rounding":null;
   const tax=/^(?:IVA|I\.V\.A\.?|IMPUESTO|TAX)\b/i.test(clean);
   if(adjustmentKind||tax){
    const included=!/no\s+incluid/i.test(clean)&&/incluid[oa]|incl\.?\b/i.test(clean);
@@ -130,12 +131,12 @@ export function parseReceiptDocument(text:string,ocrLines?:ReceiptOcrLine[]):{ex
    const percent=last&&/^%\s*(?:incluid[oa])?\.?$/i.test(clean.slice(last.end));
    if((ends||percent)&&last?.value){
     const kind=adjustmentKind??"service",label=clean.slice(0,last.start).replace(/[-−:=]+$/g,"").trim().slice(0,80)||"Cargo";
-    const key=`${kind}:${label.toLowerCase()}:${last.value}:${percent?"percent":"fixed"}`;
+    const key=`${kind}:${last.value}:${percent?"percent":"fixed"}`;
     if((!totalsStarted||!adjustmentKeys.has(key))&&extraction.adjustments.length<12){extraction.adjustments.push({label,kind,amount:percent?null:last.value,percent:percent?last.value:null,included:kind==="tip"?(included?true:null):true,subtract:kind==="discount"||(kind==="rounding"&&last.negative===true)});adjustmentKeys.add(key);}
    }else issue("Hay descuentos, propinas o cargos ilegibles: completalos manualmente.");
    pending=[];pendingDetail=null;continue;
   }
-  if(metadata.test(clean)||/^(?:(?:UYU|USD|EUR|ARS|BRL|MXN)\s*)+$/i.test(clean)){pending=[];pendingDetail=null;continue;}
+  if(isReceiptMetadata(clean)||metadata.test(clean)||/^(?:mozo|mesero|camarero|vendedor)\s*:?\s+[^$]+$/i.test(clean)||/^(?:(?:UYU|USD|EUR|ARS|BRL|MXN)\s*)+$/i.test(clean)){pending=[];pendingDetail=null;continue;}
   if(totalsStarted)continue;
   const multiplication=clean.match(/(?:^|\s)(\d{1,12}(?:[.,]\d{1,4})?)\s*[x@]\s*/i);
   if(multiplication){
@@ -168,7 +169,7 @@ export function parseReceiptDocument(text:string,ocrLines?:ReceiptOcrLine[]):{ex
   }
   // Only adjacent name lines are joined; metadata and totals reset this state.
   if(/[a-záéíóúñ]/i.test(clean)&&!/[0-9]{5,}|https?:|www\.|@/.test(clean)){
-   if(!analysis.merchant&&index<4&&!pending.length&&!extraction.items.length&&(metadata.test(lines[index+1]?.text??"")||/restaurante|supermercado|parrilla|caf[eé]|\bbar\b|\bS\.A\./i.test(clean))){analysis.merchant=clean.slice(0,120);continue;}
+   if(!analysis.merchant&&index<4&&!pending.length&&!extraction.items.length&&metadata.test(lines[index+1]?.text??"")){analysis.merchant=clean.slice(0,120);continue;}
    pending=[...pending,line].slice(-2);
   }else pending=[];
  }
