@@ -35,7 +35,21 @@ export async function handleAuthCallback(request: NextRequest) {
         ? await supabase.auth.exchangeCodeForSession(code, ...(flowId ? [{ flowId }] : []))
         : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: type as "email" | "signup" | "recovery" });
       failure = result.error;
-      if (!result.error && result.data.session && result.data.user) return response;
+      if (!result.error && result.data.session && result.data.user) {
+        // Offer only once after verified signup (email or OAuth). Missing optional
+        // migration/network failure must not turn a successful login into failure.
+        if (result.data.user.email_confirmed_at && type !== "recovery" && destination !== "/actualizar-contrasena") {
+          try {
+            const offered = await supabase.rpc("tuki_offer_payment_onboarding");
+            if (!offered.error && offered.data === true) {
+              const welcome = privateRedirect(`/bienvenida-pagos?next=${encodeURIComponent(destination)}`, request);
+              response.cookies.getAll().forEach(cookie => welcome.cookies.set(cookie));
+              return welcome;
+            }
+          } catch { /* Optional welcome never blocks authentication. */ }
+        }
+        return response;
+      }
       if (!result.error) failure = { code: "callback_session_missing" };
     } catch (error) { failure = error; }
   }

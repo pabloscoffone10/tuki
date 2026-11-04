@@ -1,3 +1,4 @@
+vi.mock("@/features/bank-accounts/actions",()=>({loadBankAccounts:vi.fn().mockResolvedValue({accounts:[]})}));
 vi.mock("@/features/payments/actions",()=>({createPayment:vi.fn()}));
 vi.mock("@/features/payments/operation-actions",()=>({recoverPaymentOperation:async()=>({operation:null}),resumePaymentOperation:vi.fn(),resolvePaymentOperation:vi.fn()}));
 import { render,screen,waitFor } from "@testing-library/react";
@@ -23,4 +24,10 @@ it("accepts Spanish decimals and optional administrative explanation only with c
 });
 it("does not offer recording or creditor reminders to an unauthorized viewer",()=>{
  render(<QuickDebtActions {...props} canRecord={false} canRemind={false}/>);expect(screen.queryByRole("button",{name:"Marcar como pagado"})).not.toBeInTheDocument();expect(screen.queryByRole("button",{name:"Pago parcial"})).not.toBeInTheDocument();expect(screen.queryByRole("button",{name:"Recordar pago"})).not.toBeInTheDocument();expect(screen.getByRole("button",{name:"Copiar recordatorio"})).toBeVisible();
+});
+
+it("offers recipient details and submits a partial bank request through the existing payment flow",async()=>{
+ const {loadBankAccounts}=await import("@/features/bank-accounts/actions");vi.mocked(loadBankAccounts).mockResolvedValue({accounts:[{id:a,bank:"BROU",holder:"Pablo Perez",identifier:"123456",currency:"UYU",alias:"",is_default:true}]});
+ mocks.load.mockResolvedValue({data:{person_id:a,options:[{payer_id:a,receiver_id:b,max_minor:"80000",scope:"global"}],obligations:[],payments:[]}});
+ const user=userEvent.setup();render(<QuickDebtActions {...props} canPay/>);await user.click(screen.getByRole("button",{name:"Pagar deuda"}));await screen.findByRole("button",{name:/Copiar n.mero de cuenta/});const input=screen.getByLabelText("Importe en UYU");await user.clear(input);await user.type(input,"125,50");await user.click(screen.getByRole("checkbox",{name:/Confirmo que el dinero/}));await user.click(screen.getByRole("button",{name:/Ya realic. la transferencia/}));await waitFor(()=>expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({received:false,data:expect.objectContaining({bankTransfer:true,bankAccountId:a,amount:"125.50",method:"bank"})})));
 });

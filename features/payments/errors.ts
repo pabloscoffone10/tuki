@@ -1,5 +1,6 @@
 import { financeError } from "@/features/finance/errors";
 const messages:Record<string,string>={
+ payment_bank_pending:"Ya hay un pago pendiente para este destinatario. Revisalo en Pagos antes de registrar otra transferencia.",
  operation_unresolved:"Hay una operación anterior sin conciliar. Consultá el resultado original antes de iniciar otro pago.",operation_unavailable:"No tenés acceso a ese intento o ya fue cancelado.",operation_cancelled:"Este intento se canceló sin registrar pago. Consultá su resultado antes de iniciar otro.",invalid_input:"Los datos no son válidos. No se registró un pago con este intento.",
  payment_receiver_required:"Solo el receptor puede confirmar o rechazar este pago. Si hay invitados, también puede actuar un administrador autorizado del origen.",payment_admin_not_allowed:"La confirmación administrativa requiere al menos un invitado y permisos de administrador sobre el grupo de origen.",payment_confirmation_mode:"Elegí confirmación personal del receptor o confirmación administrativa, sin combinar ambas.",
  payment_forbidden:"No tenés autorización para esta operación de pago.",payment_counterparty_required:"Aplicá la migración 009: debe confirmar el receptor o, si hay invitados, un administrador del origen con motivo.",

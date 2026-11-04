@@ -1,3 +1,4 @@
+vi.mock("@/features/avatars/deletion-storage",()=>({finishAvatarGroupDeletion:async()=>true}));
 // @vitest-environment node
 import { beforeEach,afterEach,it,expect,vi } from 'vitest';
 const mocks=vi.hoisted(()=>({status:vi.fn(),rpc:vi.fn(),remove:vi.fn(),service:vi.fn()}));

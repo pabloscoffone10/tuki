@@ -13,3 +13,11 @@ it("never switches the requested pair silently when that debt is no longer avail
 it("keeps exact decimal payloads and resets final consent when payment details change",async()=>{
  const user=userEvent.setup();render(<PaymentForm id={g} workspace={data}/>);const amount=await screen.findByLabelText("Importe pagado en UYU");await user.clear(amount);await user.type(amount,"125,50");const confirmation=screen.getByRole("checkbox",{name:/Confirmo que el dinero/});await user.click(confirmation);await user.type(amount,"1");expect(screen.getByRole("checkbox",{name:/Confirmo que el dinero/})).not.toBeChecked();await user.clear(amount);await user.type(amount,"125,50");const form=screen.getByRole("button",{name:"Registrar pago pendiente"}).closest("form")!;expect(new FormData(form).get("amount")).toBe("125.50");
 });
+
+it("makes the existing administrative guest payment flow explicit and keeps partial amounts",async()=>{
+ const user=userEvent.setup();const guestWorkspace:PaymentWorkspace={...data,person_id:g,optional_admin_reason:true,options:[{...data.options[0],payer_name:"Guille",receiver_name:"Facu",scope:"group",can_admin_confirm:true}]};
+ render(<PaymentForm id={g} workspace={guestWorkspace} groupId={g}/>);
+ expect(await screen.findByRole("heading",{name:"Pago manual con invitados"})).toBeVisible();expect(screen.getByRole("option",{name:/Guille.*Facu.*Con invitados/})).toBeVisible();
+ const amount=screen.getByLabelText("Importe pagado en UYU");await user.clear(amount);await user.type(amount,"125,50");
+ const form=screen.getByRole("button",{name:"Registrar y confirmar como administrador"}).closest("form")!;expect(new FormData(form).get("amount")).toBe("125.50");expect(new FormData(form).get("administrative")).toBe("true");expect(new FormData(form).get("received")).toBe("false");expect(screen.getByText(/Es una declaraci.n manual/)).toBeVisible();
+});

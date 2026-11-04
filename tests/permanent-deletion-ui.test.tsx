@@ -1,3 +1,4 @@
+vi.mock("@/features/avatars/actions",()=>({avatarUrl:async()=>({}),updateAvatar:vi.fn()}));
 import { render,screen } from '@testing-library/react';
 import { it,expect,vi } from 'vitest';
 vi.mock('@/features/groups/actions',()=>({createGroup:async()=>({}),updateGroup:async()=>({}),archiveGroup:async()=>({}),createInvitation:async()=>({}),revokeInvitation:async()=>({})}));

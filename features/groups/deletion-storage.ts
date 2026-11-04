@@ -1,3 +1,4 @@
+import { finishAvatarGroupDeletion } from "@/features/avatars/deletion-storage";
 import "server-only";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -11,6 +12,7 @@ export async function finishGroupFileDeletion(groupId:string):Promise<boolean>{
   const status=await client.rpc("tuki_group_deletion_status",{p_group_id:groupId});
   if(status.error||typeof status.data!=="number")return false;
   if(status.data===0)return true;
+  if(!await finishAvatarGroupDeletion(groupId))return false;
   const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!key)return false;
   const service=createServiceClient(requireSupabaseConfig().url,key,{auth:{persistSession:false,autoRefreshToken:false}});

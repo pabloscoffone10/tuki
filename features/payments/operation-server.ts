@@ -7,6 +7,7 @@ import { operationMessage,type OperationReply,type PaymentOperation } from "./op
 export async function prepareAndSubmitPayment(id:string,payload:Record<string,unknown>):Promise<OperationReply>{
  try{
   const client=await createClient();
+  if(payload.bankTransfer){const accounts=await client.rpc("tuki_recipient_bank_accounts",{p_receiver:payload.receiverId,p_currency:"UYU"});if(accounts.error)return {error:"No pudimos validar las cuentas y tus permisos. Revis? la migraci?n bancaria y el saldo antes de registrar la transferencia."};}
   const capability=await client.rpc("tuki_payment_workspace",{p_group_id:payload.groupId??null});
   if(capability.error||!capability.data?.operation_protocol)return {error:"Aplicá la migración 010 antes de registrar pagos. No se envió una operación financiera."};
   if(payload.administrative&&(typeof payload.administrativeReason!=="string"||payload.administrativeReason.trim().length<8)&&!capability.data.optional_admin_reason)return {error:"Aplicá la migración 012 para confirmar administrativamente sin un motivo adicional de ocho caracteres. No se envió el pago."};

@@ -1,0 +1,10 @@
+﻿import { render,screen,within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach,it,expect,vi } from 'vitest';
+const mocks=vi.hoisted(()=>({load:vi.fn(),save:vi.fn()}));
+vi.mock('@/features/bank-accounts/actions',()=>({loadBankAccounts:mocks.load,saveBankAccount:mocks.save}));
+import { BankAccounts } from '@/features/bank-accounts/components';
+const account={id:'00000000-0000-4000-8000-000000000001',bank:'BROU',holder:'Ana Perez',identifier:'123456',currency:'UYU',alias:'Personal',is_default:true};
+beforeEach(()=>{vi.resetAllMocks();mocks.load.mockResolvedValue({accounts:[account]});mocks.save.mockResolvedValue({success:true});});
+it('requires confirmation to remove an account and preserves the option to cancel',async()=>{const user=userEvent.setup();render(<BankAccounts/>);await screen.findByText(/BROU/);await user.click(screen.getByRole('button',{name:'Eliminar'}));expect(mocks.save).not.toHaveBeenCalled();await user.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Cancelar'}));expect(mocks.save).not.toHaveBeenCalled();await user.click(screen.getByRole('button',{name:'Eliminar'}));await user.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Eliminar cuenta'}));expect(mocks.save).toHaveBeenCalledWith(account,true);});
+it('shows a useful empty state and keeps account creation optional',async()=>{mocks.load.mockResolvedValue({accounts:[]});render(<BankAccounts/>);expect(await screen.findByText(/no agregaste cuentas/)).toBeVisible();expect(screen.getByRole('button',{name:'Agregar cuenta'})).toBeVisible();expect(mocks.save).not.toHaveBeenCalled();});

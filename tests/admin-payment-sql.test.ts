@@ -48,3 +48,12 @@ it("does not expose internal confirmation helpers or allow direct writes",async(
  expect(result.rows[0]).toEqual({internal:false,rpc:true,writes:false});
  const functions=await db.query<{name:string}>(`select proname name from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in('public','tuki_private') and proname in('tuki_create_payment','tuki_transition_payment','confirm_payment','can_admin_payment') and not coalesce(proconfig @> array['search_path=""'],false)`);expect(functions.rows).toHaveLength(0);
 });
+
+it("settles a partial guest-to-guest debt once, audits its admin and reverses safely",async()=>{
+ const f=await fixture(),payer=await rpc(a,"tuki_add_guest",[f.g,"Guille",null]),receiver=await rpc(a,"tuki_add_guest",[f.g,"Facu",null]);await spend(f.g,receiver,payer,"800");
+ const data=payload(payer,receiver,"500",f.g,true),id=randomUUID();await pay(a,data,id);await pay(a,data,id);
+ const payment=(await query<{created_by:string;confirmed_by:string;approval_mode:string;status:string}>(a,"select created_by,confirmed_by,approval_mode,status from payments where id=$1",[id])).rows[0];expect(payment).toEqual({created_by:f.receiver,confirmed_by:f.receiver,approval_mode:"administrative",status:"confirmed"});
+ const balance=await rpc<{obligations:{debtor_id:string;creditor_id:string;amount_minor:string}[]}>(a,"tuki_group_finances",[f.g]);expect(balance.obligations.find(o=>o.debtor_id===payer&&o.creditor_id===receiver)?.amount_minor).toBe("30000");
+ expect((await query(a,"select * from payment_allocations where payment_id=$1",[id])).rows).toHaveLength(1);await expect(pay(b,{...data,amount:"100"})).rejects.toThrow("payment_admin_not_allowed");await expect(pay(a,{...data,receiverId:payer})).rejects.toThrow("payment_invalid_parties");
+ await confirm(a,id,2,"void","Corregir entrega declarada");const reversed=await rpc<{obligations:{debtor_id:string;creditor_id:string;amount_minor:string}[]}>(a,"tuki_group_finances",[f.g]);expect(reversed.obligations.find(o=>o.debtor_id===payer&&o.creditor_id===receiver)?.amount_minor).toBe("80000");
+});

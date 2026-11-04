@@ -1,3 +1,4 @@
+vi.mock("@/features/avatars/actions",()=>({avatarUrl:async()=>({}),updateAvatar:vi.fn()}));
 import { render,screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { it,expect,vi } from "vitest";

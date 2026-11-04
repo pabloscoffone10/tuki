@@ -1,3 +1,4 @@
+import { Avatar } from "@/features/avatars/avatar";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -22,7 +23,7 @@ export async function GroupDetail({params,searchParams=Promise.resolve({})}:{par
  const {group,members,admin,me,userId,people,replacementPeople=[],invitations,events}=result;const archived=!!group.archived_at;
   return <div className="space-y-7">
     <Link href="/grupos" className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-primary"><ArrowLeft className="size-3" aria-hidden="true" />Todos mis grupos</Link>
-    <div><div className="mb-3 flex flex-wrap gap-2"><Badge>{group.kind === "permanent" ? "Permanente" : "Temporal"}</Badge><Badge>{archived ? "Archivado" : "Activo"}</Badge><Badge>{admin ? "Sos administrador" : "Sos miembro"}</Badge></div><h1 className="break-words text-3xl font-semibold tracking-tight">{group.name}</h1><p className="mt-3 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{group.description || "Un espacio para compartir, sin vueltas."}</p><p className="mt-3 text-xs text-muted-foreground">Creado el {formatGroupDate(group.created_at)}</p></div>
+    <div><div className="mb-3 flex flex-wrap gap-2"><Badge>{group.kind === "permanent" ? "Permanente" : "Temporal"}</Badge><Badge>{archived ? "Archivado" : "Activo"}</Badge><Badge>{admin ? "Sos administrador" : "Sos miembro"}</Badge></div><div className="flex items-center gap-3"><Avatar kind="group" targetId={group.id} name={group.name}/><h1 className="break-words text-3xl font-semibold tracking-tight">{group.name}</h1></div><p className="mt-3 max-w-2xl whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{group.description || "Un espacio para compartir, sin vueltas."}</p><p className="mt-3 text-xs text-muted-foreground">Creado el {formatGroupDate(group.created_at)}</p></div>
     {archived && <p role="status" className="rounded-xl border bg-card p-4 text-sm leading-7">Este grupo conserva sus participantes e historial. Las invitaciones y los cambios de integrantes están pausados hasta desarchivarlo.</p>}
     <div className="flex flex-wrap gap-3">{!archived&&<Button asChild className="w-full sm:w-auto"><Link href={`/grupos/${group.id}/gastos/nuevo`}>Nuevo gasto</Link></Button>}<Button asChild variant="outline"><Link href={`/pagos?grupo=${group.id}`}>Pagos y confirmaciones</Link></Button></div>
     <GroupNavigation groupId={group.id} section={section} admin={admin}/>

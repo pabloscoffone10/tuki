@@ -1,0 +1,10 @@
+import { render,screen,fireEvent,within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach,it,expect,vi } from 'vitest';
+const mocks=vi.hoisted(()=>({update:vi.fn()}));
+vi.mock('@/features/avatars/actions',()=>({avatarUrl:async()=>({}),updateAvatar:mocks.update}));
+import { AvatarEditor } from '@/features/avatars/editor';
+const props={kind:'profile' as const,targetId:'00000000-0000-4000-8000-000000000001',name:'Ana'};
+beforeEach(()=>{vi.resetAllMocks();mocks.update.mockResolvedValue({success:true});});
+it('confirms removal before restoring the default image',async()=>{const user=userEvent.setup();render(<AvatarEditor {...props}/>);await user.click(screen.getByRole('button',{name:'Eliminar foto'}));expect(mocks.update).not.toHaveBeenCalled();const dialog=screen.getByRole('dialog');await user.click(within(dialog).getByRole('button',{name:'Eliminar foto'}));expect(await screen.findByText(/Foto eliminada/)).toBeVisible();expect(mocks.update).toHaveBeenCalledOnce();expect((mocks.update.mock.calls[0][0] as FormData).get('remove')).toBe('true');});
+it('rejects invalid client formats before opening a crop or sending bytes',async()=>{render(<AvatarEditor {...props}/>);const input=screen.getByLabelText('Elegir foto');fireEvent.change(input,{target:{files:[new File(['text'],'avatar.svg',{type:'image/svg+xml'})]}});expect(await screen.findByText(/hasta 8 MB/,{selector:'p[role=status]'})).toBeVisible();expect(screen.queryByRole('dialog')).not.toBeInTheDocument();expect(mocks.update).not.toHaveBeenCalled();});

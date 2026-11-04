@@ -87,3 +87,14 @@ it('blocks unknown external cascades from expense tables before touching financi
  const f=await fixture();await expense(f);await db.exec('create schema future_domain;create table future_domain.links(expense_id uuid references public.expenses(id) on delete cascade)');
  try{await expect(rpc(f.a,'tuki_delete_group',[f.g,true])).rejects.toThrow('removal_schema_changed');expect(await rows('public.expenses','group_id',f.g)).toHaveLength(1);}finally{await db.exec('drop table future_domain.links;drop schema future_domain');}
 });
+
+it('allows the reviewed bank table while retaining global bank accounts after group deletion',async()=>{
+ const f=await fixture(),account=randomUUID();await rpc(f.a,'tuki_save_bank_account',[account,JSON.stringify({bank:'BROU',holder:'Owner Name',identifier:'123456789',currency:'UYU',alias:'',is_default:true}),false]);
+ await rpc(f.a,'tuki_delete_group',[f.g,true]);
+ expect(await rows('public.bank_accounts','id',account)).toHaveLength(1);expect(await rows('public.persons','id',f.owner)).toHaveLength(1);
+});
+it('reproduces the bank table schema drift and fixes only its reviewed allowlist entry',async()=>{
+ const f=await fixture();const definition=(await db.query<{definition:string}>("select pg_get_functiondef('tuki_private.removal_schema_known()'::regprocedure) definition")).rows[0].definition;
+ try{await db.exec(definition.replace(",'bank_accounts'",''));await expect(rpc(f.a,'tuki_delete_group',[f.g,true])).rejects.toThrow('removal_schema_changed');expect(await rows('public.groups','id',f.g)).toHaveLength(1);}finally{await db.exec(definition);}
+ await rpc(f.a,'tuki_delete_group',[f.g,true]);expect(await rows('public.groups','id',f.g)).toHaveLength(0);
+});

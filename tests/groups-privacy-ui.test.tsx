@@ -1,3 +1,4 @@
+vi.mock("@/features/avatars/actions",()=>({avatarUrl:async()=>({}),updateAvatar:vi.fn()}));
 vi.mock("@/features/finance/components/views",()=>({ExpenseList:()=>null,GroupFinance:()=>null}));
 vi.mock("@/features/reports/statistics",()=>({GroupStatisticsPanel:()=>null}));
 vi.mock("@/features/reports/expense-browser",()=>({ExpenseBrowser:()=>null}));
