@@ -6,10 +6,21 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { listGroups } from "../data";
 import { formatGroupDate } from "../format";
+import { createReadOnlyClient } from "@/lib/supabase/server";
+import { ActionForm } from "./action-form";
+import { Confirmation } from "./fields";
+import { safeRemoval } from "@/features/finance/actions";
+import { z } from "zod";
 
-export async function GroupsList() {
+export async function GroupsList({cleanupId,deleted=false}:{cleanupId?:string;deleted?:boolean}={}) {
   const { groups, error } = await listGroups();
+  let pending=false;
+  if(z.uuid().safeParse(cleanupId).success){
+    try{const client=await createReadOnlyClient();const status=await client.rpc("tuki_group_deletion_status",{p_group_id:cleanupId!});pending=!status.error&&status.data>0;}catch{/* Keep the group list available. */}
+  }
   return <div className="space-y-7"><div className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-3xl font-semibold tracking-tight">Mis grupos</h1><p className="mt-2 text-sm text-muted-foreground">Tu gente, tus planes. Una identidad en todos tus grupos.</p></div><Button asChild><Link href="/grupos/nuevo"><Plus aria-hidden="true" />Crear grupo</Link></Button></div>
+    {deleted&&<p role="status" className="rounded-xl border p-4 text-sm">Grupo eliminado definitivamente.</p>}
+    {pending&&<Card className="p-5"><p role="status" className="mb-4 text-sm">El grupo y sus movimientos se eliminaron. Queda pendiente borrar archivos privados del almacenamiento. Reintentá la limpieza; si continúa, el servidor necesita revisar Storage y SUPABASE_SERVICE_ROLE_KEY.</p><ActionForm action={safeRemoval} label="Reintentar limpieza de archivos" variant="outline"><input type="hidden" name="mode" value="group"/><input type="hidden" name="id" value={cleanupId}/><Confirmation>Confirmo el borrado permanente de los archivos pendientes de este grupo eliminado.</Confirmation></ActionForm></Card>}
     {error ? <p role="alert" className="rounded-xl border bg-card p-6 text-sm leading-7 text-destructive">{error}</p> : groups.length === 0 ? <Card><EmptyState icon={UsersRound} title="Todo empieza con un grupo" description="Creá un espacio para tu próxima salida o tus planes de siempre. Después podés sumar invitados o enviar enlaces para unirse." action={<Button asChild><Link href="/grupos/nuevo">Crear mi primer grupo</Link></Button>} /></Card> : <>
       {[false, true].map((archived) => <section key={String(archived)} className="space-y-4" aria-label={archived ? "Grupos archivados" : "Grupos activos"}>
         <h2 className="flex items-center gap-2 text-sm font-semibold">{archived && <Archive className="size-4" aria-hidden="true" />}{archived ? "Archivados" : "Activos"}<Badge>{groups.filter((group) => !!group.archived_at === archived).length}</Badge></h2>

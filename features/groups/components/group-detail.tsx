@@ -31,6 +31,6 @@ export async function GroupDetail({params,searchParams=Promise.resolve({})}:{par
     {section==="gastos"&&<section className="space-y-4"><h2 className="text-xl font-semibold">Gastos del grupo</h2><ExpenseBrowser groupId={group.id} canCreate={!archived} searchParams={searchParams}/></section>}
     {section==="saldos"&&<GroupFinance groupId={group.id} ledgerOnly/>}
     {section==="personas"&&<GroupPeople group={group} members={members} admin={admin} me={me} userId={userId} people={people} replacementPeople={replacementPeople}/>}
-    {section==="ajustes"&&<><FinancialHistory groupId={group.id} searchParams={searchParams}/><GroupSettings group={group} admin={admin} invitations={invitations} events={events}/></>}
+    {section==="ajustes"&&<><FinancialHistory groupId={group.id} searchParams={searchParams}/><GroupSettings group={group} admin={admin} owner={group.created_by===me?.person_id&&me.status==="active"} invitations={invitations} events={events}/></>}
   </div>;
 }

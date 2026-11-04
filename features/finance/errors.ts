@@ -1,4 +1,10 @@
 const messages:Record<string,string>={
+ group_owner_required:"Solo el creador con participación activa puede eliminar definitivamente este grupo.",
+ group_owner_cannot_remove:"El creador debe conservar su pertenencia para administrar la eliminación del grupo.",
+ group_shared_financial_history:"Hay pagos o solicitudes que vinculan este grupo con otros. No se puede borrarlo sin afectar su historial compartido. Conservá el grupo archivado.",
+ member_replacement_history:"Esta participación conserva una corrección de identidad y no puede borrarse.",
+ member_financial_history:"Este participante tiene gastos, pagos o solicitudes asociados, incluso históricos. No puede eliminarse definitivamente. Resolv? las solicitudes pendientes o retiralo para conservar el historial.",
+ member_pending_balance:"Tiene deudas pendientes con integrantes del grupo. Deben resolverse antes de eliminar su participación.",
  beta_currency_uyu_only:"Durante la beta, las operaciones nuevas son únicamente en UYU, sin conversión.",beta_historical_currency_locked:"La moneda y la cotización históricas deben conservarse; no se puede convertir este gasto durante la beta.",
  expense_has_confirmed_payments:"Este gasto incluye personas con pagos confirmados entre sí. Antes de editarlo o anularlo, las personas autorizadas deben anular esos pagos. El historial se conserva.",
  invalid_bill:"Revisá los productos, cantidades y cargos de la cuenta.",bill_unassigned:"Hay productos o cargos sin asignar.",bill_quantities:"Las cantidades asignadas deben sumar la cantidad del producto.",bill_negative:"Un descuento deja un consumo negativo.",bill_confirmation_required:"Confirmá la revisión de la cuenta.",bill_review_required:"Revisá y confirmá los campos dudosos.",bill_total_mismatch:"El total del ticket no coincide. Corregí los datos o agregá un redondeo explícito.",bill_total_required:"Ingresá el total del ticket o explicá por qué no es legible.",bill_document_required:"Editá esta cuenta desde el editor de productos para conservar su desglose.",bill_ticket_unavailable:"El ticket privado no está disponible para esta cuenta.",

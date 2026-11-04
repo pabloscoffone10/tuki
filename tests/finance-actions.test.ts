@@ -1,18 +1,19 @@
 import { beforeEach,it,expect,vi } from "vitest";
-const mocks=vi.hoisted(()=>({requireUser:vi.fn(),rpc:vi.fn(),redirect:vi.fn(),refresh:vi.fn(),uploadTicket:vi.fn(),remove:vi.fn()}));
+const mocks=vi.hoisted(()=>({requireUser:vi.fn(),rpc:vi.fn(),redirect:vi.fn(),refresh:vi.fn(),uploadTicket:vi.fn(),remove:vi.fn(),cleanup:vi.fn()}));
 vi.mock("@/features/auth/session",()=>({requireUser:mocks.requireUser}));
 vi.mock("@/lib/supabase/server",()=>({createClient:async()=>({rpc:mocks.rpc})}));
+vi.mock("@/features/groups/deletion-storage",()=>({finishGroupFileDeletion:mocks.cleanup}));
 vi.mock("@/features/smart-bills/storage",()=>({uploadTicket:mocks.uploadTicket}));
 vi.mock("next/navigation",()=>({redirect:mocks.redirect}));vi.mock("next/cache",()=>({revalidatePath:mocks.refresh}));
 import { saveExpense,voidExpense,safeRemoval } from "@/features/finance/actions";
 const id="00000000-0000-4000-8000-000000000001",other="00000000-0000-4000-8000-000000000002";
 const form=(values:Record<string,string>)=>{const f=new FormData();for(const [k,v] of Object.entries(values))f.set(k,v);return f;};
 const valid=()=>form({id,groupId:other,version:"0",title:"Cena",notes:"",date:"2026-11-02",category:"food",currency:"UYU",amount:"100",rate:"1",payerId:id,method:"equal",shares:JSON.stringify([{personId:other,input:"1"}]),createdBy:"attacker",total_minor:"1"});
-beforeEach(()=>{vi.resetAllMocks();mocks.requireUser.mockResolvedValue({id:"authenticated"});mocks.rpc.mockResolvedValue({data:id,error:null});mocks.redirect.mockImplementation(()=>{throw Error("REDIRECT");});});
+beforeEach(()=>{vi.resetAllMocks();mocks.cleanup.mockResolvedValue(true);mocks.requireUser.mockResolvedValue({id:"authenticated"});mocks.rpc.mockResolvedValue({data:id,error:null});mocks.redirect.mockImplementation(()=>{throw Error("REDIRECT");});});
 it("verifies session and sends only validated input, never client totals or author",async()=>{await expect(saveExpense({},valid())).rejects.toThrow("REDIRECT");expect(mocks.requireUser).toHaveBeenCalled();const args=mocks.rpc.mock.calls[0][1];expect(args.p_data).not.toHaveProperty("total_minor");expect(args.p_data).not.toHaveProperty("createdBy");expect(args.p_expected_version).toBe(0);expect(mocks.redirect).toHaveBeenCalledWith(`/gastos/${id}`);});
 it("blocks invalid shares and missing session before SQL",async()=>{const f=valid();f.set("shares","invalid");expect((await saveExpense({},f)).error).toBeDefined();expect(mocks.rpc).not.toHaveBeenCalled();mocks.requireUser.mockRejectedValue(Error("REDIRECT"));await expect(saveExpense({},valid())).rejects.toThrow("REDIRECT");});
 it("requires confirmation for void and every deletion mode",async()=>{expect((await voidExpense({},form({id,version:"1"}))).error).toBeDefined();for(const mode of ["group","member","guest"])expect((await safeRemoval({},form({id,groupId:other,mode}))).error).toBeDefined();expect(mocks.rpc).not.toHaveBeenCalled();});
-it("distinguishes retirement and reports safe errors without backend details",async()=>{mocks.rpc.mockResolvedValue({data:"retired",error:null});expect((await safeRemoval({},form({id,groupId:other,mode:"member",confirm:"yes"}))).success).toContain("retirado");mocks.rpc.mockResolvedValue({error:{message:"secret implementation SQL",code:"XX999"}});const result=await saveExpense({},valid());expect(result.error).toBeDefined();expect(result.error).not.toContain("secret");});
+it("deletes membership and reports safe errors without backend details",async()=>{mocks.rpc.mockResolvedValue({data:"retired",error:null});expect((await safeRemoval({},form({id,groupId:other,mode:"member",confirm:"yes"}))).success).toContain("eliminada");mocks.rpc.mockResolvedValue({error:{message:"secret implementation SQL",code:"XX999"}});const result=await saveExpense({},valid());expect(result.error).toBeDefined();expect(result.error).not.toContain("secret");});
 it("reports stale versions and financial-history deletion blocks",async()=>{mocks.rpc.mockResolvedValue({error:{message:"expense_conflict"}});expect((await saveExpense({},valid())).error).toContain("Recargá");mocks.rpc.mockResolvedValue({error:{message:"group_has_financial_history"}});expect((await safeRemoval({},form({id,mode:"group",confirm:"yes"}))).error).toContain("archivarlo");});
 it("rejects new foreign expenses on the server before saving or uploading, while not trusting a forged edit version",async()=>{
  const f=valid();f.set("currency","USD");f.set("rate","40");mocks.rpc.mockResolvedValue({error:{message:"expense_forbidden",code:"42501"}});expect((await saveExpense({},f)).error).toContain("únicamente en UYU");expect(mocks.rpc).not.toHaveBeenCalledWith("tuki_save_expense",expect.anything());expect(mocks.uploadTicket).not.toHaveBeenCalled();f.set("version","1");expect((await saveExpense({},f)).error).toContain("permiso");
@@ -22,4 +23,14 @@ it("preserves the currency and rate of an authorized historical edit and rejects
 });
 it.each(["sql-rejection","lost-response"])("never deletes a deterministic private ticket on %s because it can belong to a committed attempt",async(failure)=>{
  const f=valid();f.set("smartBill",JSON.stringify({currency:"UYU",rate:"1",items:[{id:other,name:"Cena",quantity:"1",priceMode:"subtotal",price:"100",discount:"0",split:"equal",consumers:[{personId:other,input:"1"}],reviewed:true}],adjustments:[],ticketTotal:"100",noTotalReason:"",confirmed:true,uploadId:null}));f.set("receipt",new File(["fixture"],"ticket.png",{type:"image/png"}));mocks.uploadTicket.mockResolvedValue({id:other,path:"private/object",client:{storage:{from:()=>({remove:mocks.remove})}}});mocks.rpc.mockImplementation(async()=>{if(failure==="lost-response")throw Error("network after commit");return {error:{code:"23505",message:"expense_conflict"}};});expect((await saveExpense({},f)).error).toBeDefined();expect(mocks.uploadTicket).toHaveBeenCalledOnce();expect(mocks.remove).not.toHaveBeenCalled();
+});
+
+it("refreshes all private projections after deleting membership through the strict RPC",async()=>{
+ await safeRemoval({},form({id,groupId:other,mode:"member",confirm:"yes"}));expect(mocks.rpc).toHaveBeenCalledWith("tuki_delete_member",{p_group_id:other,p_person_id:id,p_confirm:true});expect(mocks.refresh).toHaveBeenCalledWith("/","layout");expect(mocks.cleanup).not.toHaveBeenCalled();
+});
+it("redirects only after committed deletion and exposes a retry when Storage is pending",async()=>{
+ mocks.cleanup.mockResolvedValue(false);await expect(safeRemoval({},form({id,mode:"group",confirm:"yes"}))).rejects.toThrow("REDIRECT");expect(mocks.cleanup).toHaveBeenCalledWith(id);expect(mocks.redirect).toHaveBeenCalledWith(`/grupos?limpieza=${id}`);expect(mocks.refresh).toHaveBeenCalledWith("/","layout");
+});
+it("does not clean Storage or claim success after authorization failure",async()=>{
+ mocks.rpc.mockResolvedValue({error:{message:"group_owner_required",code:"42501"}});expect((await safeRemoval({},form({id,mode:"group",confirm:"yes"}))).error).toContain("creador");expect(mocks.cleanup).not.toHaveBeenCalled();expect(mocks.refresh).not.toHaveBeenCalled();
 });

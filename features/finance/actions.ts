@@ -11,6 +11,7 @@ import { calculateBill,validateReconciliation,type SmartBill } from "@/features/
 import { uploadTicket } from "@/features/smart-bills/storage";
 import { TicketError } from "@/features/smart-bills/errors";
 import { betaExpenseCurrency } from "./beta-currency";
+import { finishGroupFileDeletion } from "@/features/groups/deletion-storage";
 function refresh(){revalidatePath("/","layout");}
 const unavailable={error:"No pudimos conectar con Tuki. Volvé a intentar."};
 export async function saveExpense(_state:GroupState,form:FormData):Promise<GroupState>{
@@ -63,8 +64,8 @@ export async function safeRemoval(_state:GroupState,form:FormData):Promise<Group
  await requireUser();const parsed=z.object({mode:z.enum(["group","member","guest"]),id:z.uuid(),groupId:z.uuid().optional(),confirm:z.literal("yes")}).safeParse(Object.fromEntries(form));
  if(!parsed.success)return {error:"Confirmá la eliminación y revisá los datos."};
  const {mode,id,groupId}=parsed.data;if(mode==="member"&&!groupId)return {error:"Falta el grupo."};
- let outcome:unknown;
- try{const client=await createClient();const {data,error}=await client.rpc(mode==="group"?"tuki_delete_group":mode==="guest"?"tuki_delete_orphan_guest":"tuki_remove_member",mode==="group"?{p_group_id:id,p_confirm:true}:mode==="guest"?{p_person_id:id,p_confirm:true}:{p_group_id:groupId,p_person_id:id,p_confirm:true});if(error)return {error:financeError(error)};outcome=data;}catch{return unavailable;}
- refresh();if(mode==="group")redirect("/grupos");
- return {success:outcome==="retired"?"Participante retirado: se conservaron sus referencias históricas.":mode==="guest"?"Invitado sin referencias eliminado.":"Participación eliminada de este grupo. Su identidad global se conserva."};
+ let filesDeleted=true;
+ try{const client=await createClient();const {error}=await client.rpc(mode==="group"?"tuki_delete_group":mode==="guest"?"tuki_delete_orphan_guest":"tuki_delete_member",mode==="group"?{p_group_id:id,p_confirm:true}:mode==="guest"?{p_person_id:id,p_confirm:true}:{p_group_id:groupId,p_person_id:id,p_confirm:true});if(error)return {error:error.code==="PGRST202"?"Falta aplicar la migración 015 de eliminación definitiva en Supabase.":financeError(error)};if(mode==="group")filesDeleted=await finishGroupFileDeletion(id);}catch{return unavailable;}
+ refresh();if(mode==="group")redirect(filesDeleted?"/grupos?eliminado=1":`/grupos?limpieza=${id}`);
+ return {success:mode==="guest"?"Invitado sin referencias eliminado.":"Participación eliminada de este grupo. Su identidad global se conserva."};
 }
