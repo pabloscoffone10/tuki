@@ -1,13 +1,38 @@
 // @vitest-environment node
 import { afterEach,beforeEach,it,expect,vi } from "vitest";
 vi.mock("server-only",()=>({}));
-import { OpenAiReceiptProvider,receiptProvider,aiConfigured } from "@/features/smart-bills/provider";
+import { GeminiReceiptProvider,OpenAiReceiptProvider,receiptProvider,aiConfigured } from "@/features/smart-bills/provider";
 import { extractionSchema } from "@/features/smart-bills/extraction-schema";
 const extracted={currency:"UYU",total:"100.00",items:[{name:"Agua",quantity:"2",unitPrice:"50",subtotal:"100",discount:null,uncertain:false}],adjustments:[],warnings:[],complete:true};
 const fetchMock=vi.fn();
-beforeEach(()=>{vi.stubGlobal("fetch",fetchMock);fetchMock.mockReset();vi.stubEnv("TUKI_AI_PROVIDER","");vi.stubEnv("OPENAI_API_KEY","");vi.stubEnv("TUKI_AI_MODEL","");});
+beforeEach(()=>{vi.stubGlobal("fetch",fetchMock);fetchMock.mockReset();vi.stubEnv("GEMINI_API_KEY","");vi.stubEnv("TUKI_AI_PROVIDER","");vi.stubEnv("OPENAI_API_KEY","");vi.stubEnv("TUKI_AI_MODEL","");});
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
 it("keeps manual mode available without configured provider",()=>{expect(receiptProvider()).toBeNull();expect(aiConfigured()).toBe(false);expect(fetchMock).not.toHaveBeenCalled();});
+it("selects only Gemini even with legacy paid provider configuration",()=>{
+ vi.stubEnv("TUKI_AI_PROVIDER","openai");vi.stubEnv("OPENAI_API_KEY","legacy");vi.stubEnv("TUKI_AI_MODEL","paid");
+ expect(receiptProvider()).toBeNull();vi.stubEnv("GEMINI_API_KEY","test");expect(receiptProvider()).toBeInstanceOf(GeminiReceiptProvider);
+});
+it("sends Gemini an inline image and JSON schema without putting the key in the URL or body",async()=>{
+ fetchMock.mockResolvedValue(new Response(JSON.stringify({candidates:[{finishReason:"STOP",content:{parts:[{text:JSON.stringify(extracted)}]}}]})));
+ expect(await new GeminiReceiptProvider("test-secret").extract({bytes:Buffer.from("image"),mime:"image/png",pages:1})).toEqual(extracted);
+ const [url,options]=fetchMock.mock.calls[0];expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent");
+ expect(options.headers["x-goog-api-key"]).toBe("test-secret");expect(options.cache).toBe("no-store");
+ const body=JSON.parse(options.body);expect(body.contents[0].parts[1].inlineData).toEqual({mimeType:"image/png",data:Buffer.from("image").toString("base64")});
+ expect(body.generationConfig).toMatchObject({responseMimeType:"application/json",maxOutputTokens:4000});expect(body.generationConfig.responseJsonSchema.required).toContain("total");expect(options.body).not.toContain("test-secret");
+});
+it("does not retry Gemini quota errors or fall back to a paid provider",async()=>{
+ fetchMock.mockResolvedValue(new Response("private diagnostics",{status:429}));
+ await expect(new GeminiReceiptProvider("test").extract({bytes:Buffer.from("x"),mime:"image/jpeg",pages:1})).rejects.toThrow(/cuota/);expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+it.each([
+ {candidates:[{finishReason:"MAX_TOKENS",content:{parts:[{text:JSON.stringify(extracted)}]}}]},
+ {promptFeedback:{blockReason:"SAFETY"}},
+ {candidates:[{finishReason:"STOP",content:{parts:[{text:'{"items":[]}'}]}}]},
+ {candidates:[{finishReason:"STOP",content:{parts:[{text:'not json'}]}}]},
+])("rejects unsafe or incomplete Gemini responses",async response=>{
+ fetchMock.mockResolvedValue(new Response(JSON.stringify(response)));
+ await expect(new GeminiReceiptProvider("test").extract({bytes:Buffer.from("x"),mime:"image/png",pages:1})).rejects.toThrow(/incompleta o inválida/);
+});
 it("sends a bounded server-only Responses request with structured schema and no storage",async()=>{
  fetchMock.mockResolvedValue(new Response(JSON.stringify({status:"completed",output:[{type:"message",content:[{type:"output_text",text:JSON.stringify(extracted)}]}]})));
  const provider=new OpenAiReceiptProvider("test-key-never-real","vision-model");expect(await provider.extract({bytes:Buffer.from("test"),mime:"image/png",pages:1})).toEqual(extracted);

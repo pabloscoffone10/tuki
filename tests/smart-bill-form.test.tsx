@@ -1,13 +1,43 @@
 import { render,screen,within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { it,expect,vi } from "vitest";
-const mocks=vi.hoisted(()=>({scan:vi.fn(async()=>({error:"not configured"}))}));
+const mocks=vi.hoisted(()=>({scan:vi.fn(async()=>({error:"not configured"})),ocr:vi.fn()}));
 vi.mock("@/features/finance/actions",()=>({saveExpense:async()=>({})}));
 vi.mock("@/features/smart-bills/actions",()=>({scanTicket:mocks.scan}));
+vi.mock("@/features/smart-bills/browser-ocr",()=>({readTicketLocally:mocks.ocr,clearLocalOcrCache:vi.fn()}));
 import { SmartBillForm } from "@/features/smart-bills/components/smart-bill-form";
 import type { SmartBill } from "@/features/smart-bills/domain";
 import type { ExpenseDetail } from "@/features/finance/types";
 const a="00000000-0000-4000-8000-000000000001",b="00000000-0000-4000-8000-000000000002";
+it("imports local OCR only after review without Gemini or automatic expense creation",async()=>{
+ mocks.scan.mockClear();mocks.ocr.mockResolvedValue({text:"Agua 100,00",extraction:{currency:null,total:"100.00",items:[{name:"Agua",quantity:null,unitPrice:null,subtotal:"100.00",discount:null,uncertain:true}],adjustments:[],warnings:[],complete:false}});
+ const user=userEvent.setup();const view=render(<SmartBillForm id={a} groupId={b} aiAvailable={false} people={[]}/>);
+ await user.upload(screen.getByLabelText(/Comprobante privado/),new File(["photo"],"ticket.png",{type:"image/png"}));
+ await user.click(screen.getByRole("button",{name:"Leer foto gratis (OCR local)"}));
+ const importButton=await screen.findByRole("button",{name:"Reemplazar borrador con datos detectados"});
+ expect(JSON.parse((view.container.querySelector('[name="smartBill"]') as HTMLInputElement).value).items).toEqual([]);
+ await user.selectOptions(screen.getByLabelText("Confirmar moneda del ticket"),"UYU");await user.click(importButton);
+ const bill=JSON.parse((view.container.querySelector('[name="smartBill"]') as HTMLInputElement).value);
+ expect(bill.items[0]).toMatchObject({name:"Agua",quantity:"",price:"100.00",reviewed:false,consumers:[]});expect(bill.confirmed).toBe(false);expect(mocks.scan).not.toHaveBeenCalled();
+});
+it("leaves the draft available after a local OCR failure without automatically using Gemini",async()=>{
+ mocks.scan.mockClear();mocks.ocr.mockRejectedValue(Error("No se encontró texto legible"));
+ const user=userEvent.setup();render(<SmartBillForm id={a} groupId={b} aiAvailable people={[]}/>);
+ await user.upload(screen.getByLabelText(/Comprobante privado/),new File(["photo"],"ticket.png",{type:"image/png"}));await user.click(screen.getByRole("button",{name:"Leer foto gratis (OCR local)"}));
+ expect(await screen.findByRole("alert")).toHaveTextContent("No se encontró texto legible");expect(mocks.scan).not.toHaveBeenCalled();expect(screen.getByRole("button",{name:"Agregar producto manualmente"})).toBeEnabled();
+});
+it("offers a gallery/file picker and a rear-camera capture input",()=>{
+ render(<SmartBillForm id={a} groupId={b} aiAvailable people={[]}/>);
+ expect(screen.getByLabelText(/Comprobante privado/)).not.toHaveAttribute("capture");
+ expect(screen.getByLabelText("Tomar foto del ticket")).toHaveAttribute("capture","environment");
+ expect(screen.getByRole("checkbox",{name:/Acepto enviar este ticket/})).toHaveAccessibleName(/Google Gemini/);
+});
+it("rejects oversized photos before sending a scan request",async()=>{
+ mocks.scan.mockReset();const user=userEvent.setup();render(<SmartBillForm id={a} groupId={b} aiAvailable people={[]}/>);
+ await user.upload(screen.getByLabelText(/Comprobante privado/),new File([new Uint8Array(2*1024*1024+1)],"large.png",{type:"image/png"}));
+ await user.click(screen.getByRole("checkbox",{name:/Acepto enviar este ticket/}));await user.click(screen.getByRole("button",{name:"Escanear o recuperar ticket"}));
+ expect(screen.getByRole("alert")).toHaveTextContent("2 MiB");expect(mocks.scan).not.toHaveBeenCalled();
+});
 it("keeps manual loading available without AI and preserves products across summary tabs",async()=>{
  const user=userEvent.setup();render(<SmartBillForm id={a} groupId={b} aiAvailable={false} people={[{id:a,name:"Mati",status:"active",replaced:false},{id:b,name:"Pablo",status:"active",replaced:false}]}/>);
  expect(screen.getByText(/Escaneo con IA no disponible/)).toBeVisible();

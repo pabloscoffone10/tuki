@@ -6,9 +6,9 @@ import type { GroupState } from "../types";
 import { isOnline,useConnectivity } from "@/components/pwa/connectivity";
 import { unstable_rethrow } from "next/navigation";
 
-export function ActionForm({ action, children, label, variant = "default" }: {
+export function ActionForm({ action, children, label, variant = "default",submitDisabled=false }: {
   action: (state: GroupState, form: FormData) => Promise<GroupState>;
-  children: ReactNode; label: string; variant?: "default" | "outline";
+  children: ReactNode; label: string; variant?: "default" | "outline";submitDisabled?:boolean;
 }) {
   const preserveDraft=useRef(false);
   const [state, submit, pending] = useActionState(async(previous:GroupState,form:FormData)=>{
@@ -34,6 +34,6 @@ export function ActionForm({ action, children, label, variant = "default" }: {
       {copyError && <p role="status" className="text-xs text-muted-foreground">Seleccioná el enlace y copialo manualmente.</p>}
     </div>}
     {!online&&<p role="status" className="text-xs text-muted-foreground">Necesitás conexión para enviar. Podés seguir revisando el formulario en esta ventana.</p>}
-    <Button type="submit" variant={variant} disabled={pending||!online}>{pending && <LoaderCircle className="animate-spin" aria-hidden="true" />}{pending ? "Guardando…" : label}</Button>
+    <Button type="submit" variant={variant} disabled={pending||!online||submitDisabled}>{pending && <LoaderCircle className="animate-spin" aria-hidden="true" />}{pending ? "Guardando…" : label}</Button>
   </form>;
 }
