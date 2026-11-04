@@ -1,0 +1,11 @@
+import { describe,it,expect } from "vitest";
+import { resolveVoice,voiceSummary,voiceSchema } from "@/features/smart-bills/voice-domain";
+const people=["Pablo","Mati","Guille"].map((name,i)=>({id:`00000000-0000-4000-8000-00000000000${i+1}`,name,status:"active",replaced:false}));
+const data={currency:"UYU" as const,total:"2100",items:[{name:"Pizza",amount:"1200",payer:"yo",consumers:["Pablo","Mati","Guille"]},{name:"Bebidas",amount:"600",payer:"Mati",consumers:["Pablo","Mati","Guille"]},{name:"Postre",amount:"300",payer:"Guille",consumers:["Guille"]}],adjustments:[],warnings:[],complete:true};
+describe("narrated expense domain",()=>{
+ it("preserves different payers and exact balances",()=>{const items=resolveVoice(voiceSchema.parse(data),people,people[0].id);const result=voiceSummary(items,people,"2100");expect(result.total).toBe(210000n);expect(result.difference).toBe(0n);expect(result.ledger.map(p=>[p.paid,p.consumed])).toEqual([[120000n,60000n],[60000n,60000n],[30000n,90000n]]);});
+ it("leaves ambiguous names, todos and missing facts for local questions",()=>{const items=resolveVoice({...data,items:[{name:null,amount:null,payer:"P",consumers:["todos"]}]},people);expect(items[0]).toMatchObject({name:"",amount:"",payerId:"",consumers:[]});expect(()=>voiceSummary(items,people,"")).toThrow();});
+ it("never resolves duplicate names or unavailable self",()=>{expect(resolveVoice({...data,items:[data.items[0]]},[...people,{...people[1],name:"Pablo"}])[0]).toMatchObject({payerId:"",consumers:[]});});
+ it("detects inconsistent narrated totals and allocates cents exactly",()=>{const items=resolveVoice({...data,items:[{name:"Pizza",amount:"500",payer:"yo",consumers:people.map(p=>p.name)}]},people,people[0].id);const result=voiceSummary(items,people,"501");expect(result.difference).toBe(-100n);expect(result.ledger.reduce((n,p)=>n+p.consumed,0n)).toBe(50000n);});
+ it("rejects invalid model amounts, foreign currency and extra fields",()=>{expect(voiceSchema.safeParse({...data,currency:"USD"}).success).toBe(false);expect(voiceSchema.safeParse({...data,items:[{...data.items[0],amount:"NaN"}]}).success).toBe(false);expect(voiceSchema.safeParse({...data,secret:"x"}).success).toBe(false);});
+});
