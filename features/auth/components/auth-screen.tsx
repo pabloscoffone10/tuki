@@ -1,3 +1,4 @@
+import { PublicFooter } from "@/components/layout/public-footer";
 import { Suspense } from "react";
 import { Brand } from "@/components/layout/brand";
 import { ThemeSwitcher } from "@/components/layout/theme-switcher";
@@ -17,6 +18,6 @@ export function AuthScreen({ mode, searchParams }: { mode: AuthMode; searchParam
     <main id="contenido" className="flex flex-1 items-center justify-center px-4 py-10"><div className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-sm sm:p-9">
       <Suspense fallback={<p role="status" className="py-12 text-center text-sm text-muted-foreground">Preparando tu acceso…</p>}><FormWithQuery mode={mode} searchParams={searchParams} /></Suspense>
     </div></main>
-    <footer className="p-6 text-center text-xs text-muted-foreground">Tuki · Compartir, sin vueltas.</footer>
+    <PublicFooter/>
   </div>;
 }

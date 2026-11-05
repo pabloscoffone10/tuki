@@ -8,7 +8,7 @@ export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   // This exact machine endpoint authenticates its own cron credential and is
   // disabled by default. It must not depend on a browser session cookie.
-  if(request.nextUrl.pathname==="/api/internal/reminders"){
+  if(["/api/internal/reminders", "/api/internal/feedback"].includes(request.nextUrl.pathname)){
     response.headers.set("Cache-Control","no-store");return response;
   }
   // The callback owns the exchange and its cookie writes. Do not race it with

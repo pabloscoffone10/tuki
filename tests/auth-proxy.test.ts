@@ -15,13 +15,13 @@ beforeEach(() => {
 });
 
 describe("proxy de autenticación", () => {
-  it.each(["/", "/grupos", "/balances", "/pagos", "/actividad", "/configuracion", "/ayuda", "/actualizar-contrasena", "/grupos/privado"])("protege %s sin sesión", async (path) => {
+  it.each(["/", "/grupos", "/balances", "/pagos", "/actividad", "/configuracion", "/actualizar-contrasena", "/grupos/privado"])("protege %s sin sesión", async (path) => {
     const response = await updateSession(new NextRequest(`https://tuki.example${path}`));
     expect(response.status).toBe(307);
     expect(new URL(response.headers.get("location")!).pathname).toBe("/login");
     expect(response.headers.get("cache-control")).toContain("no-store");
   });
-  it.each(["/login", "/registro", "/recuperar-contrasena", "/auth/callback"])("permite %s sin sesión", async (path) => {
+  it.each(["/ayuda", "/feedback", "/login", "/registro", "/recuperar-contrasena", "/auth/callback"])("permite %s sin sesión", async (path) => {
     const response = await updateSession(new NextRequest(`https://tuki.example${path}`));
     expect(response.status).toBe(200);
   });

@@ -1,4 +1,4 @@
-const publicPaths = new Set(["/login", "/registro", "/recuperar-contrasena"]);
+const publicPaths = new Set(["/ayuda", "/feedback", "/login", "/registro", "/recuperar-contrasena"]);
 
 export function isPublicPath(pathname: string) {
   return publicPaths.has(pathname) || pathname === "/auth/callback" || pathname === "/auth/confirm";
