@@ -9,7 +9,8 @@ import { idSchema } from "../schemas";
 import { formatGroupDate } from "../format";
 import { GroupPeople } from "./group-people";
 import { GroupSettings } from "./group-settings";
-import { GroupNavigation,groupSection } from "./group-navigation";
+import { GroupNavigation, groupSection } from "./group-navigation";
+import { GroupChat } from "./group-chat";
 import { GroupDebtControl } from "@/features/payments/components/workspace";
 import { GroupFinance } from "@/features/finance/components/views";
 import { ExpenseBrowser } from "@/features/reports/expense-browser";
@@ -32,6 +33,7 @@ export async function GroupDetail({params,searchParams=Promise.resolve({})}:{par
     {section==="gastos"&&<section className="space-y-4"><h2 className="text-xl font-semibold">Gastos del grupo</h2><ExpenseBrowser groupId={group.id} canCreate={!archived} searchParams={searchParams}/></section>}
     {section==="saldos"&&<GroupFinance groupId={group.id} ledgerOnly/>}
     {section==="personas"&&<GroupPeople group={group} members={members} admin={admin} me={me} userId={userId} people={people} replacementPeople={replacementPeople}/>}
+    {section==="chat"&&<GroupChat group={group} admin={admin} personId={me?.person_id??null} members={members} />}
     {section==="ajustes"&&<><FinancialHistory groupId={group.id} searchParams={searchParams}/><GroupSettings group={group} admin={admin} owner={group.created_by===me?.person_id&&me.status==="active"} invitations={invitations} events={events}/></>}
   </div>;
 }

@@ -8,13 +8,13 @@ import { saveExpense } from "../actions";
 import { allocate,convertToUyu,formatUyu,unitsDecimal,type SplitMethod } from "../domain";
 import type { ExpenseDetail,FinancePerson } from "../types";
 
-export function ExpenseForm({id,groupId,people,initial,currentPersonId}:{id:string;groupId:string;people:FinancePerson[];initial?:ExpenseDetail;currentPersonId?:string}){
+export function ExpenseForm({id,groupId,people,initial,currentPersonId,prefill}:{id:string;groupId:string;people:FinancePerson[];initial?:ExpenseDetail;currentPersonId?:string;prefill?:{title:string;amount:string}}){
  const errorId=useId();
  const oldIds=new Set(initial?.shares.map(s=>s.personId));if(initial)oldIds.add(initial.payer_id);
  const available=people.filter(p=>!p.replaced&&(p.status==="active"||(p.status==="retired"&&oldIds.has(p.id))));
  const defaultPayer=available.some(p=>p.id===currentPersonId&&p.status==="active")?currentPersonId:"";
- const [title,setTitle]=useState(initial?.title??""),[notes,setNotes]=useState(initial?.notes??""),[category,setCategory]=useState(initial?.category??"other"),[date,setDate]=useState(initial?.date??new Date().toLocaleDateString("en-CA",{timeZone:"America/Montevideo"}));
- const [amount,setAmount]=useState(initial?unitsDecimal(initial.original_minor):"");
+ const [title,setTitle]=useState(initial?.title??prefill?.title??""),[notes,setNotes]=useState(initial?.notes??""),[category,setCategory]=useState(initial?.category??"other"),[date,setDate]=useState(initial?.date??new Date().toLocaleDateString("en-CA",{timeZone:"America/Montevideo"}));
+ const [amount,setAmount]=useState(initial?unitsDecimal(initial.original_minor):prefill?.amount??"");
  const currency=initial?.currency??"UYU",rate=initial?.rate??"1";
  const [payer,setPayer]=useState(initial?.payer_id??defaultPayer??""),[method,setMethod]=useState<SplitMethod>(initial?.method??"equal");
  // New expenses never silently include every member. Existing revisions retain
