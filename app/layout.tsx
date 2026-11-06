@@ -1,4 +1,5 @@
 ﻿import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import type { Viewport } from "next";
 import { PwaStatus } from "@/components/pwa/pwa-status";
@@ -17,7 +18,7 @@ export const viewport:Viewport={width:"device-width",initialScale:1,viewportFit:
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es-UY" suppressHydrationWarning className="h-full antialiased">
-      <body className="min-h-full"><ThemeProvider><PwaStatus/>{children}</ThemeProvider></body>
+      <body className="min-h-full"><ThemeProvider><PwaStatus/>{children}</ThemeProvider><Analytics /></body>
     </html>
   );
 }
