@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { InstallCta } from "@/components/pwa/install-cta";
 import { changePassword, googleLogin, login, recoverPassword, register } from "@/features/auth/actions";
 import type { AuthState } from "@/features/auth/schemas";
 
@@ -54,6 +55,7 @@ export function AuthForm({ mode, next = "/", callbackError = false, callbackDeta
       <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><span className="flex-1 border-t" />o continuá con<span className="flex-1 border-t" /></div>
       <form action={googleAction} className="space-y-3"><input type="hidden" name="next" value={next} /><Feedback state={googleState} /><Button variant="outline" className="w-full" disabled={pending || googlePending}>{googlePending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <span aria-hidden="true" className="font-semibold">G</span>}Google</Button></form>
     </>}
+    <InstallCta />
     <div className="mt-7 text-center text-sm text-muted-foreground">
       {mode === "login" ? <>¿Primera vez por acá? <Link className="font-medium text-primary hover:underline" href={`/registro?next=${encodeURIComponent(next)}`}>Creá tu cuenta</Link></> : mode === "register" ? <>¿Ya tenés cuenta? <Link className="font-medium text-primary hover:underline" href={`/login?next=${encodeURIComponent(next)}`}>Iniciá sesión</Link></> : <Link className="font-medium text-primary hover:underline" href={mode === "password" ? "/configuracion" : "/login"}>{mode === "password" ? "Volver a mi cuenta" : "Volver al inicio de sesión"}</Link>}
     </div>
