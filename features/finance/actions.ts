@@ -52,7 +52,7 @@ export async function saveExpense(_state:GroupState,form:FormData):Promise<Group
   // Never delete it on a rejected retry or an ambiguous transport outcome.
   if(error)return {error:financeError(error)};
  }catch(e){return {error:e instanceof TicketError?e.message:"No pudimos confirmar el guardado. Consultá Gastos antes de reenviar; un comprobante privado subido se conserva para evitar perder un archivo de una operación confirmada."};}
- refresh();redirect(`/gastos/${id}`);
+ refresh();redirect(`/gastos/${id}?guardado=1`);
 }
 export async function voidExpense(_state:GroupState,form:FormData):Promise<GroupState>{
  await requireUser();const parsed=z.object({id:z.uuid(),version:z.coerce.number().int().positive(),confirm:z.literal("yes")}).safeParse(Object.fromEntries(form));
